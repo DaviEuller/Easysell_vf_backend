@@ -19,7 +19,9 @@ export class UsersService {
     private readonly userDocument: Model<UserDocument>,
   ) {}
 
-  async create(createUserDto: CreateUserDto): Promise<UserDocument> {
+  async create(
+    createUserDto: CreateUserDto,
+  ): Promise<UserDocument> {
     const { password, ...userData } = createUserDto;
 
     const passwordHash = await bcrypt.hash(password, 10);
@@ -40,12 +42,19 @@ export class UsersService {
     return this.userDocument.find().exec();
   }
 
-  async findByEmail(email: string): Promise<UserDocument | null> {
-    return this.userDocument.findOne({ email }).exec();
+  async findByEmail(
+    email: string,
+  ): Promise<UserDocument | null> {
+    return this.userDocument
+      .findOne({ email })
+      .select('+passwordHash')
+      .exec();
   }
 
   async remove(id: string): Promise<UserDocument> {
-    const user = await this.userDocument.findByIdAndDelete(id).exec();
+    const user = await this.userDocument
+      .findByIdAndDelete(id)
+      .exec();
 
     if (!user) {
       throw new NotFoundException(
@@ -61,7 +70,9 @@ export class UsersService {
     updateUserDto: UpdateUserDto,
   ): Promise<UserDocument> {
     const user = await this.userDocument
-      .findByIdAndUpdate(id, updateUserDto, { new: true })
+      .findByIdAndUpdate(id, updateUserDto, {
+        new: true,
+      })
       .exec();
 
     if (!user) {
