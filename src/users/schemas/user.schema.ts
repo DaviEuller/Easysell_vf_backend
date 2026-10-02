@@ -1,30 +1,42 @@
-  import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-  import { Document, Types } from 'mongoose';
+import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
+import { Document, Types } from 'mongoose';
 
-  export type UserDocument = User & Document;
+import { UserRole } from '../enum/user.role.enum.js';
 
-  @Schema({ timestamps: true })
-  export class User {
-    @Prop({ required: true, trim: true })
-    name: string;
+export type UserDocument = User & Document;
 
-    @Prop({ required: true, unique: true, lowercase: true, trim: true, index: true })
-    email: string;
+@Schema({ timestamps: true })
+export class User {
+  @Prop({ type: Date, default: Date.now })
+  createdAt: Date;
 
-    // Nunca guardar a senha em texto puro — sempre o hash (ex: bcrypt)
-    @Prop({ required: true, select: false })
-    passwordHash: string;
+  @Prop({ type: Date, default: Date.now })
+  updatedAt: Date;
 
-    // Preenchido depois que a empresa é criada/associada
-    @Prop({ type: Types.ObjectId, ref: 'Company', index: true })
-    company?: Types.ObjectId;
+  @Prop({ required: true, trim: true })
+  name: string;
 
-    // Se o usuário também for um funcionário (login de equipe)
-    @Prop({ type: Types.ObjectId, ref: 'Employee' })
-    employee?: Types.ObjectId;
+  @Prop({ required: true, unique: true, lowercase: true, trim: true, index: true })
+  email: string;
 
-    @Prop({ enum: ['owner', 'funcionario'], default: 'owner' })
-    role: string;
-  }
+  // Nunca guardar a senha em texto puro — sempre o hash (ex: bcrypt)
+  @Prop({ required: true, select: false })
+  passwordHash: string;
 
-  export const UserSchema = SchemaFactory.createForClass(User);
+  // Preenchido depois que a empresa é criada/associada
+  @Prop({ type: Types.ObjectId, ref: 'Company', index: true })
+  company?: Types.ObjectId;
+
+  // Se o usuário também for um funcionário (login de equipe)
+  @Prop({ type: Types.ObjectId, ref: 'Employee' })
+  employee?: Types.ObjectId;
+
+  @Prop({
+    type: String,
+    enum: Object.values(UserRole),
+    default: UserRole.ADMINISTRADOR,
+  })
+  role: UserRole;
+}
+
+export const UserSchema = SchemaFactory.createForClass(User);

@@ -1,6 +1,7 @@
 import {
   IsEmail,
   IsEnum,
+  IsMongoId,
   IsNotEmpty,
   IsOptional,
   IsString,
@@ -26,4 +27,12 @@ export class CreateUserDto {
   @IsEnum(UserRole)
   @IsOptional()
   role?: UserRole;
+
+  @IsOptional()
+  @IsMongoId()
+  company?: string;
+
+  @IsOptional()
+  @IsMongoId()
+  employee?: string;
 }

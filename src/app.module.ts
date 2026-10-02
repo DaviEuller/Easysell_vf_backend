@@ -8,6 +8,7 @@ import { MongooseModule } from '@nestjs/mongoose';;
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ProdutosModule } from './produtos/produtos.module.js';
 import { ClientesModule } from './clientes/clientes.module.js';
+import { CompanyModule } from './company/company.module.js';
 export const { ObserveModule, ObserveInstrument } = createObserveModule();
 
 @Module({
@@ -32,6 +33,9 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
 
 
      ClientesModule,
+
+
+     CompanyModule,
 
   ],
   controllers: [AppController],
