@@ -7,6 +7,10 @@ import {
   Cliente,
   ClienteSchema,
 } from './Schemas/clientes.schemas.js';
+  import {
+  Produto,
+  ProdutoSchema,
+} from '../produtos/Schemas/Schemas.produtos.js';
 
 @Module({
   imports: [
@@ -14,6 +18,10 @@ import {
       {
         name: Cliente.name,
         schema: ClienteSchema,
+      },
+      {
+        name: Produto.name,
+        schema: ProdutoSchema,
       },
     ]),
   ],

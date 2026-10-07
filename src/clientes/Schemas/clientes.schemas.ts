@@ -13,10 +13,10 @@ export class Cliente {
   Numero: string;
 
   @Prop({ required: true })
-  Id_Produto: string;
+  IdProduto: string;
 
   @Prop({ required: true })
-  id_company: string;
+  idcompany: string;
 
   @Prop({ required: true })
   Preco_gasto: number;

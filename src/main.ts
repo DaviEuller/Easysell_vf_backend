@@ -1,4 +1,5 @@
 import * as dns from 'node:dns';
+import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { AppModule, ObserveInstrument } from './app.module.js';
 
@@ -9,11 +10,19 @@ async function bootstrap() {
     instrument: ObserveInstrument,
   });
 
+  app.useGlobalPipes(
+    new ValidationPipe({
+      transform: true,
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transformOptions: {
+        enableImplicitConversion: true,
+      },
+    }),
+  );
+
   app.enableCors({
-    origin: [
-      'http://localhost:5173',
-      // 'https://seu-frontend.vercel.app',
-    ],
+    origin: ['http://localhost:5173'],
     credentials: true,
   });
 

@@ -1,4 +1,8 @@
-  import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 
@@ -8,16 +12,40 @@ import {
   Cliente,
   ClienteDocument,
 } from './Schemas/clientes.schemas.js';
+import {
+  Produto,
+  ProdutoDocument,
+} from '../produtos/Schemas/Schemas.produtos.js';
 
 @Injectable()
 export class ClientesService {
-
   constructor(
     @InjectModel(Cliente.name)
     private readonly clienteModel: Model<ClienteDocument>,
+    @InjectModel(Produto.name)
+    private readonly produtoModel: Model<ProdutoDocument>,
   ) {}
 
   async create(createClienteDto: CreateClienteDto): Promise<ClienteDocument> {
+    const produto = await this.produtoModel.findById(createClienteDto.IdProduto).exec();
+
+    if (!produto) {
+      throw new NotFoundException(
+        `Produto com id ${createClienteDto.IdProduto} não encontrado`,
+      );
+    }
+
+    const quantidadeSolicitada = Number(createClienteDto.Quantidade ?? 0);
+
+    if (quantidadeSolicitada > Number(produto.quantidade)) {
+      throw new BadRequestException(
+        `Quantidade solicitada (${quantidadeSolicitada}) excede o estoque disponível (${produto.quantidade})`,
+      );
+    }
+
+    produto.quantidade = Number(produto.quantidade) - quantidadeSolicitada;
+    await produto.save();
+
     const cliente = new this.clienteModel(createClienteDto);
 
     return cliente.save();
@@ -40,7 +68,7 @@ export class ClientesService {
   }
 
   async findByCompany(companyId: string): Promise<ClienteDocument[]> {
-      return this.clienteModel.find({ companyId }).exec();
+      return this.clienteModel.find({ idcompany: companyId }).exec();
     }
 
   async update(

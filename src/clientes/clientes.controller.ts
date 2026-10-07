@@ -17,14 +17,14 @@ export class ClientesController {
     return this.clientesService.findAll();
   }
 
+  @Get('company/:idcompany')
+  findByCompany(@Param('idcompany') companyId: string) {
+    return this.clientesService.findByCompany(companyId);
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.clientesService.findOne(id);
-  }
-
-  @Get(':idcompany')
-  findByCompany(@Param('idcompany') companyId:string){
-    return this.clientesService.findByCompany(companyId)
   } 
 
   @Patch(':id')
