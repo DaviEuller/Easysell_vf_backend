@@ -9,6 +9,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ProdutosModule } from './produtos/produtos.module.js';
 import { ClientesModule } from './clientes/clientes.module.js';
 import { CompanyModule } from './company/company.module.js';
+import { EquipeModule } from './equipe/equipe.module.js';
 export const { ObserveModule, ObserveInstrument } = createObserveModule();
 
 @Module({
@@ -36,6 +37,9 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
 
 
      CompanyModule,
+
+
+     EquipeModule,
 
   ],
   controllers: [AppController],

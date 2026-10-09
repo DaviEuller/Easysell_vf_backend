@@ -12,7 +12,8 @@ export class AuthService {
   ) {}
 
   async validateUser(email: string, password: string): Promise<any> {
-    const user = await this.usersService.findByEmail(email);
+    const normalizedEmail = email.trim().toLowerCase();
+    const user = await this.usersService.findByEmail(normalizedEmail);
 
     if (!user) {
       throw new UnauthorizedException('Credenciais inválidas');
@@ -47,6 +48,7 @@ export class AuthService {
       email: user.email,
       role: user.role,
       empresaId: user.empresaId,
+      equipeMember: user.equipeMember?.toString(),
     };
   }
 }

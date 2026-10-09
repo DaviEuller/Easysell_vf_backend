@@ -31,10 +31,13 @@ export class User {
   @Prop({ type: Types.ObjectId, ref: 'Employee' })
   employee?: Types.ObjectId;
 
+  @Prop({ type: Types.ObjectId, ref: 'Equipe' })
+  equipeMember?: Types.ObjectId;
+
   @Prop({
     type: String,
     enum: Object.values(UserRole),
-    default: UserRole.ADMINISTRADOR,
+    default: UserRole.FUNCIONARIO,
   })
   role: UserRole;
 }

@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -8,8 +9,28 @@ import { Model } from 'mongoose';
 
 import { Company, CompanyDocument } from './schemas/company.schema.js';
 import { Employee, EmployeeDocument } from './schemas/employee.schema.js';
+import { User, UserDocument } from '../users/schemas/user.schema.js';
+import { UserRole } from '../users/enum/user.role.enum.js';
 import { CreateCompanyDto } from './dto/create-company.dto.js';
 import { UpdateCompanyDto } from './dto/update-company.dto.js';
+
+function isDuplicateCnpjError(error: unknown): boolean {
+  if (typeof error !== 'object' || error === null || !('code' in error)) {
+    return false;
+  }
+  if (error.code !== 11000) return false;
+
+  if ('keyPattern' in error && typeof error.keyPattern === 'object') {
+    return (
+      error.keyPattern !== null &&
+      'cnpj' in error.keyPattern
+    );
+  }
+
+  return 'message' in error &&
+    typeof error.message === 'string' &&
+    /index:\s*cnpj_1\b/.test(error.message);
+}
 
 @Injectable()
 export class CompanyService {
@@ -18,11 +39,55 @@ export class CompanyService {
     private readonly companyModel: Model<CompanyDocument>,
     @InjectModel(Employee.name)
     private readonly employeeModel: Model<EmployeeDocument>,
+    @InjectModel(User.name)
+    private readonly userModel: Model<UserDocument>,
   ) {}
 
   async create(createCompanyDto: CreateCompanyDto): Promise<CompanyDocument> {
+    const responsible = await this.userModel
+      .findById(createCompanyDto.responsavelId)
+      .exec();
+    if (!responsible) {
+      throw new NotFoundException(
+        `Usuário responsável com id ${createCompanyDto.responsavelId} não encontrado`,
+      );
+    }
+
     const company = new this.companyModel(createCompanyDto);
-    return company.save();
+    let savedCompany: CompanyDocument;
+    try {
+      savedCompany = await company.save();
+    } catch (error) {
+      if (isDuplicateCnpjError(error)) {
+        throw new ConflictException('Este CNPJ já está cadastrado.');
+      }
+      throw error;
+    }
+
+    try {
+      const updatedResponsible = await this.userModel
+        .findByIdAndUpdate(
+          createCompanyDto.responsavelId,
+          {
+            $set: {
+              company: savedCompany._id,
+              role: UserRole.ADMINISTRADOR,
+            },
+          },
+          { returnDocument: 'after', runValidators: true },
+        )
+        .exec();
+
+      if (!updatedResponsible) {
+        throw new NotFoundException(
+          'O usuário responsável não está mais disponível',
+        );
+      }
+      return savedCompany;
+    } catch (error) {
+      await this.companyModel.findByIdAndDelete(savedCompany._id).exec();
+      throw error;
+    }
   }
 
   async addEmployeeToCompany(
@@ -33,7 +98,7 @@ export class CompanyService {
       .findByIdAndUpdate(
         companyId,
         { $addToSet: { employeeIds: employeeId } },
-        { new: true, runValidators: true },
+        { returnDocument: 'after', runValidators: true },
       )
       .exec();
 
@@ -80,7 +145,7 @@ export class CompanyService {
   ): Promise<CompanyDocument> {
     const company = await this.companyModel
       .findByIdAndUpdate(id, updateCompanyDto, {
-        new: true,
+        returnDocument: 'after',
         runValidators: true,
       })
       .exec();

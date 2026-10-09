@@ -45,7 +45,7 @@ export class ProdutosService {
     this.assertValidObjectId(id, 'atualizar o produto');
 
     const produto = await this.produtoModel
-      .findByIdAndUpdate(id, updateProdutoDto, { new: true })
+      .findByIdAndUpdate(id, updateProdutoDto, { returnDocument: 'after' })
       .exec();
 
     if (!produto) {

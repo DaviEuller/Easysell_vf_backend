@@ -78,7 +78,7 @@ export class ClientesService {
 
     const cliente = await this.clienteModel
       .findByIdAndUpdate(id, updateClienteDto, {
-        new: true,
+        returnDocument: 'after',
       })
       .exec();
 

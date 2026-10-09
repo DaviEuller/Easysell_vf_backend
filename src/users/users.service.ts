@@ -9,6 +9,7 @@ import { Model } from 'mongoose';
 import { User, UserDocument } from './schemas/user.schema.js';
 import { CreateUserDto } from './dto/create-user.dto.js';
 import { UpdateUserDto } from './dto/update-user.dto.js';
+import { UserRole } from './enum/user.role.enum.js';
 
 import * as bcrypt from 'bcrypt';
 
@@ -29,6 +30,7 @@ export class UsersService {
     const user = new this.userDocument({
       ...userData,
       passwordHash,
+      role: UserRole.FUNCIONARIO,
     });
 
     return user.save();
@@ -71,7 +73,7 @@ export class UsersService {
   ): Promise<UserDocument> {
     const user = await this.userDocument
       .findByIdAndUpdate(id, updateUserDto, {
-        new: true,
+        returnDocument: 'after',
       })
       .exec();
 
