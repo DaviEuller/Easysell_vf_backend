@@ -10,6 +10,7 @@ import { ProdutosModule } from './produtos/produtos.module.js';
 import { ClientesModule } from './clientes/clientes.module.js';
 import { CompanyModule } from './company/company.module.js';
 import { EquipeModule } from './equipe/equipe.module.js';
+import { AiModule } from './ai/ai.module.js';
 export const { ObserveModule, ObserveInstrument } = createObserveModule();
 
 @Module({
@@ -40,6 +41,9 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
 
 
      EquipeModule,
+
+
+     AiModule,
 
   ],
   controllers: [AppController],

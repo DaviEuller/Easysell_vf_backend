@@ -44,6 +44,26 @@ $ npm run start:dev
 $ npm run start:prod
 ```
 
+## Sellia (IA)
+
+Copie `.env.example` para `.env` e configure `AI_API_BASE_URL` e a variável
+de chave indicada por `apiKeyEnv` no `agent.json` (atualmente `GROQ_API_KEY`)
+e, opcionalmente, `AI_MODEL`. A chave fica somente no ambiente do backend. As
+instruções do agente, o modelo padrão, os limites e as ferramentas ficam em
+`src/ai/agent.json`, que também é copiado para `dist/ai` durante o build.
+O endpoint é compatível com a API de Chat Completions da OpenAI e com provedores
+que aceitam o mesmo formato e chamadas de ferramentas.
+
+O recurso NestJS `ai` protege as rotas com JWT, restringe conversas e consultas
+à empresa do usuário autenticado e armazena o histórico no MongoDB existente.
+Ferramentas de leitura consultam produtos e vendas. Criação e edição de produtos,
+estoque, dados de cliente e vendas sempre ficam pendentes até uma confirmação
+explícita no frontend. A criação e a edição de vendas usam transações MongoDB;
+para essas ações, o MongoDB precisa operar com replica set (como no Atlas).
+
+Rotas: `GET /ai/conversations`, `GET /ai/conversations/:id`,
+`POST /ai/chat` e `POST /ai/conversations/:id/actions/:actionId/confirm|reject`.
+
 ## Run tests
 
 ```bash

@@ -1,0 +1,141 @@
+{
+  "provider": "openai-compatible",
+  "baseUrl": "https://api.groq.com/openai/v1",
+  "apiKeyEnv": "GROQ_API_KEY",
+  "model": "llama-3.3-70b-versatile",
+  "temperature": 0.2,
+  "maxTokens": 1200,
+  "maxToolRounds": 4,
+  "systemPrompt": "Você é a Sellia, assistente de gestão da EasySell. Responda em português do Brasil, com clareza e objetividade. Use as ferramentas para consultar dados reais da empresa antes de responder sobre produtos, estoque, clientes ou vendas. Nunca invente resultados. Para qualquer criação ou alteração, proponha uma única ação clara e aguarde a confirmação explícita do usuário; não alegue que gravou algo antes da confirmação. Não solicite nem revele segredos ou chaves de API.",
+  "tools": [
+    {
+      "type": "function",
+      "function": {
+        "name": "list_products",
+        "description": "Consulta os produtos e o estoque da empresa autenticada.",
+        "parameters": {
+          "type": "object",
+          "properties": {},
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "list_sales",
+        "description": "Consulta o histórico recente de vendas e clientes.",
+        "parameters": {
+          "type": "object",
+          "properties": {},
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "create_product",
+        "description": "Propõe criar um produto. A operação só ocorre após confirmação.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "name": { "type": "string" },
+            "category": { "type": "string" },
+            "price": { "type": "number", "minimum": 0 },
+            "stock": { "type": "integer", "minimum": 0 }
+          },
+          "required": ["name", "category", "price", "stock"],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "update_product",
+        "description": "Propõe editar o nome, categoria ou preço de um produto da empresa. Aguarda confirmação.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "productId": { "type": "string" },
+            "name": { "type": "string" },
+            "category": { "type": "string" },
+            "price": { "type": "number", "minimum": 0 }
+          },
+          "required": ["productId"],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "set_product_stock",
+        "description": "Propõe definir a quantidade em estoque de um produto. Aguarda confirmação.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "productId": { "type": "string" },
+            "quantity": { "type": "integer", "minimum": 0 }
+          },
+          "required": ["productId", "quantity"],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "create_sale",
+        "description": "Propõe registrar uma venda de um produto existente para um cliente. A venda desconta do estoque e aguarda confirmação.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "customerName": { "type": "string" },
+            "phone": { "type": "string" },
+            "productId": { "type": "string" },
+            "quantity": { "type": "integer", "minimum": 1 },
+            "unitPrice": { "type": "number", "minimum": 0 }
+          },
+          "required": ["customerName", "phone", "productId", "quantity", "unitPrice"],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "update_customer",
+        "description": "Propõe editar os dados de contato do cliente em uma venda existente. Aguarda confirmação.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "saleId": { "type": "string" },
+            "customerName": { "type": "string" },
+            "phone": { "type": "string" }
+          },
+          "required": ["saleId"],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "update_sale",
+        "description": "Propõe alterar a quantidade ou o preço unitário de uma venda existente; o estoque será ajustado. Aguarda confirmação.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "saleId": { "type": "string" },
+            "quantity": { "type": "integer", "minimum": 1 },
+            "unitPrice": { "type": "number", "minimum": 0 }
+          },
+          "required": ["saleId"],
+          "additionalProperties": false
+        }
+      }
+    }
+  ]
+}
