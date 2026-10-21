@@ -5,7 +5,6 @@ export type ClienteDocument = HydratedDocument<Cliente>;
 
 @Schema({ timestamps: true })
 export class Cliente {
-
   @Prop({ required: true })
   name: string;
 
@@ -23,6 +22,18 @@ export class Cliente {
 
   @Prop({ required: true })
   Quantidade: number;
+
+  @Prop({ type: Number, min: 1, default: 1 })
+  parcelas: number;
+
+  @Prop({ type: Number, min: 0, default: 0 })
+  valorPago: number;
+
+  @Prop({ type: Number, min: 0 })
+  saldoPendente?: number;
+
+  @Prop({ type: Date })
+  dataPrimeiroVencimento?: Date;
 }
 
 export const ClienteSchema = SchemaFactory.createForClass(Cliente);

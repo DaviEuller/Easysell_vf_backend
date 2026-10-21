@@ -41,12 +41,17 @@ describe('AuthService', () => {
       email: 'person@example.com',
       passwordHash,
       role: 'funcionario',
+      company: { toString: () => 'company-id' },
     });
 
     const result = await service.login('  Person@Example.COM  ', 'secret123');
 
     expect(findByEmail).toHaveBeenCalledWith('person@example.com');
     expect(result.accessToken).toBe('signed-token');
+    expect(result.empresaId).toBe('company-id');
+    expect(sign).toHaveBeenCalledWith(
+      expect.objectContaining({ empresaId: 'company-id' }),
+    );
   });
 
   it('rejects an email that does not match an account', async () => {

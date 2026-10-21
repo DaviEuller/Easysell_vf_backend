@@ -31,7 +31,11 @@ import { User } from '../users/schemas/user.schema.js';
 import type { UserDocument } from '../users/schemas/user.schema.js';
 import { UserRole } from '../users/enum/user.role.enum.js';
 
-type AiUser = { userId: string; empresaid?: string };
+type AiUser = {
+  userId: string;
+  companyId?: string;
+  empresaid?: string;
+};
 type AgentConfig = {
   provider: string;
   baseUrl: string;
@@ -154,7 +158,6 @@ export class AiService {
       content: prompt.trim(),
       timestamp: new Date().toISOString(),
     });
-    await conversation.save();
 
     for (let round = 0; round < this.agent.maxToolRounds; round += 1) {
       const response = await this.requestModel(conversation.messages);
@@ -193,6 +196,37 @@ export class AiService {
         timestamp: new Date().toISOString(),
       };
 
+      if (toolCall.function.name === 'create_product') {
+        this.validateProposedAction(toolCall.function.name, args);
+        const result = await this.executeWriteAction(
+          toolCall.function.name,
+          args,
+          scope.companyId,
+        );
+        const assistantText = 'Produto cadastrado com sucesso.';
+        conversation.messages.push(assistantMessage);
+        conversation.messages.push({
+          role: 'tool',
+          tool_call_id: toolCall.id,
+          name: toolCall.function.name,
+          content: JSON.stringify(result),
+          timestamp: new Date().toISOString(),
+        });
+        conversation.messages.push({
+          role: 'assistant',
+          content: assistantText,
+          timestamp: new Date().toISOString(),
+        });
+        await conversation.save();
+        return {
+          conversation: this.toConversation(conversation),
+          assistantMessage: assistantText,
+          pendingAction: null,
+          model: this.getModelName(),
+          result,
+        };
+      }
+
       if (WRITE_ACTIONS.has(toolCall.function.name)) {
         this.validateProposedAction(toolCall.function.name, args);
         const pendingAction: PendingAiAction = {
@@ -229,7 +263,6 @@ export class AiService {
         content: JSON.stringify(result),
         timestamp: new Date().toISOString(),
       });
-      await conversation.save();
     }
 
     throw new BadGatewayException(
@@ -440,6 +473,16 @@ export class AiService {
     if (!companyId || !Types.ObjectId.isValid(companyId)) {
       throw new UnauthorizedException(
         'O usuário não está associado a uma empresa.',
+      );
+    }
+    const tokenCompanyId = user.companyId ?? user.empresaid;
+    if (
+      tokenCompanyId !== undefined &&
+      (!Types.ObjectId.isValid(tokenCompanyId) ||
+        tokenCompanyId.toLowerCase() !== companyId.toLowerCase())
+    ) {
+      throw new UnauthorizedException(
+        'A empresa da sessão não corresponde ao cadastro do usuário. Faça login novamente.',
       );
     }
     return { userId, companyId };

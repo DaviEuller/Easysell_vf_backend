@@ -17,6 +17,7 @@ import { AiService } from './ai.service.js';
 type AuthenticatedRequest = Request & {
   user: {
     userId: string;
+    companyId?: string;
     empresaid?: string;
   };
 };

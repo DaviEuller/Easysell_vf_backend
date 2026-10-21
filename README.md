@@ -52,7 +52,9 @@ e, opcionalmente, `AI_MODEL`. A chave fica somente no ambiente do backend. As
 instruções do agente, o modelo padrão, os limites e as ferramentas ficam em
 `src/ai/agent.json`, que também é copiado para `dist/ai` durante o build.
 O endpoint é compatível com a API de Chat Completions da OpenAI e com provedores
-que aceitam o mesmo formato e chamadas de ferramentas.
+que aceitam o mesmo formato e chamadas de ferramentas. O modelo padrão Groq é
+`openai/gpt-oss-120b`; se `AI_MODEL` estiver definido no ambiente, ele substitui
+esse padrão. O modelo Llama 3.3 anterior foi desativado pela Groq em 16/08/2026.
 
 O recurso NestJS `ai` protege as rotas com JWT, restringe conversas e consultas
 à empresa do usuário autenticado e armazena o histórico no MongoDB existente.
@@ -63,6 +65,44 @@ para essas ações, o MongoDB precisa operar com replica set (como no Atlas).
 
 Rotas: `GET /ai/conversations`, `GET /ai/conversations/:id`,
 `POST /ai/chat` e `POST /ai/conversations/:id/actions/:actionId/confirm|reject`.
+
+## Vendas parceladas e faturas
+
+Ao criar uma venda em `POST /clientes`, podem ser informados `parcelas`,
+`valorPago` e `dataPrimeiroVencimento` (data ISO). O backend calcula
+`saldoPendente`; o pagamento inicial deve estar entre zero e o valor total da
+venda. Vendas existentes sem esses campos são interpretadas como uma parcela e
+nenhum valor pago inicialmente.
+
+Exemplo de venda com entrada e saldo parcelado:
+
+```json
+{
+  "name": "Maria Silva",
+  "Numero": "11999999999",
+  "IdProduto": "ID_DO_PRODUTO",
+  "idcompany": "ID_DA_EMPRESA",
+  "Preco_gasto": 300,
+  "Quantidade": 2,
+  "parcelas": 3,
+  "valorPago": 60,
+  "dataPrimeiroVencimento": "2026-11-21"
+}
+```
+
+Para gerar uma fatura, use `POST /faturas` com `saleId`; pode enviar
+`dueDate` para substituir a data de primeiro vencimento salva na venda. Se a
+venda tiver saldo pendente, o backend divide o saldo em parcelas mensais,
+distribuindo diferenças de centavos, e cria uma única fatura com a lista de
+parcelas. O vencimento seguinte é calculado a partir do primeiro.
+
+As rotas exigem JWT e usam a empresa do usuário autenticado:
+`GET /faturas`, `GET /faturas/vendas-disponiveis`, `POST /faturas`,
+`PATCH /faturas/:id/status` e `GET /faturas/:id/whatsapp`. Atualize uma parcela
+individual enviando `installmentNumber` junto com `status` (`pendente` ou
+`paga`) para `PATCH /faturas/:id/status`. Para cobrar o saldo restante, a rota
+de WhatsApp retorna telefone, mensagem e link `wa.me`; ela não envia a mensagem
+automaticamente. Uma venda só pode ter uma fatura.
 
 ## Run tests
 

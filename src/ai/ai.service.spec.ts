@@ -69,6 +69,7 @@ describe('AiService', () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+    vi.restoreAllMocks();
     if (previousApiKey === undefined) delete process.env.GROQ_API_KEY;
     else process.env.GROQ_API_KEY = previousApiKey;
     if (previousBaseUrl === undefined) delete process.env.AI_API_BASE_URL;
@@ -77,7 +78,26 @@ describe('AiService', () => {
     else process.env.AI_MODEL = previousModel;
   });
 
-  it('persists a write proposal without executing it before confirmation', async () => {
+  it('creates a product in Mongo when the model calls create_product', async () => {
+    const conversationSave = vi.spyOn(ConversationModelMock.prototype, 'save');
+    const createdProduct = {
+      _id: '507f1f77bcf86cd799439014',
+      name: 'Caderno',
+      categoria: 'Papelaria',
+      companyId,
+      preco: 12.5,
+      quantidade: 8,
+    };
+    const save = vi.fn().mockResolvedValue({
+      toObject: () => createdProduct,
+    });
+    const productConstructor =
+      productModel as unknown as ReturnType<typeof vi.fn>;
+    productConstructor.mockImplementation(function (
+      _values: Record<string, unknown>,
+    ) {
+      return { save };
+    });
     fetchMock.mockResolvedValue(
       new Response(
         JSON.stringify({
@@ -107,21 +127,58 @@ describe('AiService', () => {
       ),
     );
 
-    const result = await service.chat({ userId }, 'Cadastre um caderno.');
+    const result = await service.chat(
+      { userId, companyId },
+      'Cadastre um caderno.',
+    );
 
-    expect(result.pendingAction).toMatchObject({
-      id: 'call_create_product',
-      name: 'create_product',
-      status: 'pending',
+    expect(result.pendingAction).toBeNull();
+    expect(result.result).toEqual(createdProduct);
+    expect(result.assistantMessage).toBe('Produto cadastrado com sucesso.');
+    expect(productConstructor).toHaveBeenCalledOnce();
+    expect(productConstructor).toHaveBeenCalledWith({
+      name: 'Caderno',
+      categoria: 'Papelaria',
+      companyId,
+      preco: 12.5,
+      quantidade: 8,
     });
-    expect(productModel).not.toHaveBeenCalled();
+    expect(save).toHaveBeenCalledOnce();
+    expect(conversationSave).toHaveBeenCalledOnce();
     expect(fetchMock).toHaveBeenCalledOnce();
     const requestBody = JSON.parse(
       fetchMock.mock.calls[0][1].body as string,
-    ) as { messages: Record<string, unknown>[] };
+    ) as { model: string; messages: Record<string, unknown>[] };
+    expect(requestBody.model).toBe(
+      process.env.AI_MODEL?.trim() || 'openai/gpt-oss-120b',
+    );
     expect(requestBody.messages[1]).toEqual({
       role: 'user',
       content: 'Cadastre um caderno.',
     });
+  });
+
+  it('rejects an authenticated company ID that differs from the user record', async () => {
+    await expect(
+      service.chat(
+        { userId, companyId: '507f1f77bcf86cd799439099' },
+        'Liste meus produtos.',
+      ),
+    ).rejects.toThrow(
+      'A empresa da sessão não corresponde ao cadastro do usuário. Faça login novamente.',
+    );
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('does not persist an incomplete user message when the provider fails', async () => {
+    const saveSpy = vi.spyOn(ConversationModelMock.prototype, 'save');
+    fetchMock.mockResolvedValue(new Response('{}', { status: 503 }));
+
+    await expect(
+      service.chat({ userId }, 'Resuma as vendas recentes.'),
+    ).rejects.toThrow();
+
+    expect(saveSpy).not.toHaveBeenCalled();
   });
 });

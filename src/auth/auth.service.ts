@@ -33,13 +33,14 @@ export class AuthService {
 
   async login(email: string, password: string) {
     const user = await this.validateUser(email, password);
+    const empresaId = user.company?.toString();
 
     const payload = {
       sub: user._id.toString(),
       email: user.email,
       senha: user.passwordHash,
       role: user.role,
-      empresaId: user.empresaId,
+      empresaId,
     };
 
     return {
@@ -47,7 +48,7 @@ export class AuthService {
       sub: user._id.toString(),
       email: user.email,
       role: user.role,
-      empresaId: user.empresaId,
+      empresaId,
       equipeMember: user.equipeMember?.toString(),
     };
   }

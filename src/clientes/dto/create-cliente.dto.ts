@@ -1,28 +1,54 @@
+import { Type } from 'class-transformer';
 import {
+  IsDateString,
+  IsInt,
   IsNotEmpty,
   IsNumber,
+  IsOptional,
   IsString,
-  isString
+  Min,
 } from 'class-validator';
 
 export class CreateClienteDto {
-    @IsString()
-    @IsNotEmpty()
-        name: string;
+  @IsString()
+  @IsNotEmpty()
+  name: string;
 
-    @IsNotEmpty()
-        Numero: string;
+  @IsString()
+  @IsNotEmpty()
+  Numero: string;
 
-    @IsString()
-        IdProduto: string;
+  @IsString()
+  @IsNotEmpty()
+  IdProduto: string;
 
-    @IsString()
-        idcompany: string;
+  @IsString()
+  @IsNotEmpty()
+  idcompany: string;
 
-    @IsNumber()
-        Preco_gasto: Number;
+  @Type(() => Number)
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  Preco_gasto: number;
 
-    @IsNumber()
-        Quantidade: Number;
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  Quantidade: number;
 
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  parcelas?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  valorPago?: number;
+
+  @IsOptional()
+  @IsDateString()
+  dataPrimeiroVencimento?: string;
 }

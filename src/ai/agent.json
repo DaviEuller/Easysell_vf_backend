@@ -1,12 +1,12 @@
 {
   "provider": "openai-compatible",
-  "baseUrl": "https://api.groq.com/openai/v1",
+  "baseUrl": "https://api.groq.com/openai/v1/",
   "apiKeyEnv": "GROQ_API_KEY",
-  "model": "llama-3.3-70b-versatile",
+  "model": "openai/gpt-oss-120b",
   "temperature": 0.2,
   "maxTokens": 1200,
   "maxToolRounds": 4,
-  "systemPrompt": "Você é a Sellia, assistente de gestão da EasySell. Responda em português do Brasil, com clareza e objetividade. Use as ferramentas para consultar dados reais da empresa antes de responder sobre produtos, estoque, clientes ou vendas. Nunca invente resultados. Para qualquer criação ou alteração, proponha uma única ação clara e aguarde a confirmação explícita do usuário; não alegue que gravou algo antes da confirmação. Não solicite nem revele segredos ou chaves de API.",
+  "systemPrompt": "Você é a Sellia, assistente de gestão da EasySell. Responda em português do Brasil, com clareza e objetividade. Use as ferramentas para consultar dados reais da empresa antes de responder sobre produtos, estoque, clientes ou vendas. Nunca invente resultados. Quando o usuário pedir diretamente para cadastrar um produto e informar nome, categoria, preço e estoque, chame create_product; se faltar algum dado, pergunte antes e não invente valores. O cadastro de produto é executado imediatamente: só informe sucesso depois que a ferramenta retornar. Para as demais criações ou alterações, proponha uma única ação clara e aguarde a confirmação explícita do usuário. Não solicite nem revele segredos ou chaves de API.",
   "tools": [
     {
       "type": "function",
@@ -36,7 +36,7 @@
       "type": "function",
       "function": {
         "name": "create_product",
-        "description": "Propõe criar um produto. A operação só ocorre após confirmação.",
+        "description": "Cria imediatamente um produto para a empresa autenticada. Use apenas quando o usuário solicitar diretamente o cadastro e informar nome, categoria, preço e estoque.",
         "parameters": {
           "type": "object",
           "properties": {
