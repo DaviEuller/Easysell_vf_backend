@@ -44,7 +44,7 @@ $ npm run start:dev
 $ npm run start:prod
 ```
 
-## Sellia (IA)
+## Sell IA
 
 Copie `.env.example` para `.env` e configure `AI_API_BASE_URL` e a variável
 de chave indicada por `apiKeyEnv` no `agent.json` (atualmente `GROQ_API_KEY`)
@@ -65,6 +65,30 @@ para essas ações, o MongoDB precisa operar com replica set (como no Atlas).
 
 Rotas: `GET /ai/conversations`, `GET /ai/conversations/:id`,
 `POST /ai/chat` e `POST /ai/conversations/:id/actions/:actionId/confirm|reject`.
+
+## EasyBot (WhatsApp)
+
+O EasyBot conecta uma sessão WhatsApp Web por empresa usando
+[`whatsapp-web.js`](https://github.com/pedroslopez/whatsapp-web.js). Um
+administrador conecta o número lendo o QR Code na aba EasyBot do frontend.
+Os contatos e mensagens ficam no MongoDB e são sempre limitados à empresa do
+usuário autenticado. A sessão WhatsApp é salva localmente pela estratégia
+`LocalAuth`; configure `WHATSAPP_SESSION_PATH` para um volume persistente no
+servidor. Execute apenas uma instância do backend por pasta de sessão.
+
+O EasyBot envia mensagens para contatos cadastrados e só responde
+automaticamente aos contatos com resposta automática ativada. Essas respostas
+usam a Sell IA para consultar produtos e vendas, sem ferramentas de escrita.
+Configure `GROQ_API_KEY` como no recurso Sell IA. O Chrome/Chromium precisa
+estar instalado no servidor; instale o Chrome gerenciado pelo Puppeteer com
+`npx puppeteer browsers install chrome` ou configure
+`PUPPETEER_EXECUTABLE_PATH` com o caminho de um navegador instalado.
+
+Rotas protegidas por JWT: `GET /easybot/status`, `POST /easybot/connect`,
+`POST /easybot/disconnect`, `GET|POST /easybot/contacts`,
+`PATCH|DELETE /easybot/contacts/:contactId`,
+`GET /easybot/contacts/:contactId/messages` e `POST /easybot/messages`.
+O envio exige uma conexão ativa e um contato cadastrado.
 
 ## Vendas parceladas e faturas
 
@@ -176,4 +200,4 @@ Nest is an MIT-licensed open source project. It can grow thanks to the sponsors 
 ## License
 
 Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
-"# Easysell_vf_backend" 
+"# Easysell_vf_backend"

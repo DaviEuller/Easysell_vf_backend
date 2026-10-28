@@ -51,6 +51,7 @@ lerna-debug.log*
 
 # Runtime data
 pids
+.whatsapp-sessions/
 *.pid
 *.seed
 *.pid.lock

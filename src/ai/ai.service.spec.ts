@@ -8,12 +8,17 @@ import {
 } from './entities/ai-conversation.entity.js';
 import { ClienteDocument } from '../clientes/Schemas/clientes.schemas.js';
 import { ProdutoDocument } from '../produtos/Schemas/Schemas.produtos.js';
+import { EmployeeDocument } from '../company/schemas/employee.schema.js';
 import { UserDocument } from '../users/schemas/user.schema.js';
+import { UserRole } from '../users/enum/user.role.enum.js';
 
 const companyId = '507f1f77bcf86cd799439011';
 const userId = '507f1f77bcf86cd799439012';
 
 class ConversationModelMock {
+  static findOne = vi.fn();
+  static findOneAndUpdate = vi.fn();
+
   id = '507f1f77bcf86cd799439013';
   updatedAt = new Date();
   title = '';
@@ -35,6 +40,7 @@ describe('AiService', () => {
   let service: AiService;
   let fetchMock: ReturnType<typeof vi.fn>;
   let productModel: Model<ProdutoDocument>;
+  let employeeModel: Model<EmployeeDocument>;
   let previousApiKey: string | undefined;
   let previousBaseUrl: string | undefined;
   let previousModel: string | undefined;
@@ -53,15 +59,20 @@ describe('AiService', () => {
         select: vi.fn(() => ({
           exec: vi.fn().mockResolvedValue({
             company: new Types.ObjectId(companyId),
+            role: UserRole.ADMINISTRADOR,
           }),
         })),
       })),
     };
+    ConversationModelMock.findOne.mockReset();
+    ConversationModelMock.findOneAndUpdate.mockReset();
     productModel = vi.fn() as unknown as Model<ProdutoDocument>;
+    employeeModel = vi.fn() as unknown as Model<EmployeeDocument>;
     service = new AiService(
       ConversationModelMock as unknown as Model<AiConversationDocument>,
       productModel,
       {} as Model<ClienteDocument>,
+      employeeModel,
       userModel as unknown as Model<UserDocument>,
       {} as never,
     );
@@ -91,8 +102,9 @@ describe('AiService', () => {
     const save = vi.fn().mockResolvedValue({
       toObject: () => createdProduct,
     });
-    const productConstructor =
-      productModel as unknown as ReturnType<typeof vi.fn>;
+    const productConstructor = productModel as unknown as ReturnType<
+      typeof vi.fn
+    >;
     productConstructor.mockImplementation(function (
       _values: Record<string, unknown>,
     ) {
@@ -169,6 +181,159 @@ describe('AiService', () => {
     );
 
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('proposes an employee registration for explicit confirmation', async () => {
+    fetchMock.mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          choices: [
+            {
+              message: {
+                content: null,
+                tool_calls: [
+                  {
+                    id: 'call_create_employee',
+                    function: {
+                      name: 'create_employee',
+                      arguments: JSON.stringify({
+                        name: 'Ana Silva',
+                        cpf: '12345678901',
+                        funcao: 'Vendedora',
+                      }),
+                    },
+                  },
+                ],
+              },
+            },
+          ],
+        }),
+        { status: 200 },
+      ),
+    );
+
+    const result = await service.chat(
+      { userId, companyId },
+      'Cadastre Ana Silva, CPF 12345678901, como vendedora.',
+    );
+
+    expect(result.pendingAction).toMatchObject({
+      name: 'create_employee',
+      status: 'pending',
+      arguments: {
+        name: 'Ana Silva',
+        cpf: '12345678901',
+        funcao: 'Vendedora',
+      },
+    });
+    expect(employeeModel).not.toHaveBeenCalled();
+  });
+
+  it('creates a proposed employee only after administrator confirmation', async () => {
+    const createdEmployee = {
+      _id: '507f1f77bcf86cd799439015',
+      name: 'Ana Silva',
+      cpf: '12345678901',
+      funcao: 'Vendedora',
+      companyId,
+    };
+    const save = vi.fn().mockResolvedValue({
+      toObject: () => createdEmployee,
+    });
+    const employeeConstructor = employeeModel as unknown as ReturnType<
+      typeof vi.fn
+    >;
+    employeeConstructor.mockImplementation(function (
+      _values: Record<string, unknown>,
+    ) {
+      return { save };
+    });
+
+    const action: PendingAiAction = {
+      id: 'call_create_employee',
+      name: 'create_employee',
+      arguments: {
+        name: 'Ana Silva',
+        cpf: '12345678901',
+        funcao: 'Vendedora',
+      },
+      status: 'pending',
+      createdAt: new Date(),
+    };
+    const pendingConversation = new ConversationModelMock({
+      pendingAction: action,
+    });
+    const executingConversation = new ConversationModelMock({
+      pendingAction: { ...action, status: 'executing' },
+    });
+    const completedConversation = new ConversationModelMock({
+      pendingAction: null,
+    });
+    ConversationModelMock.findOne.mockReturnValue({
+      exec: vi.fn().mockResolvedValue(pendingConversation),
+    });
+    ConversationModelMock.findOneAndUpdate
+      .mockReturnValueOnce({
+        exec: vi.fn().mockResolvedValue(executingConversation),
+      })
+      .mockReturnValueOnce({
+        exec: vi.fn().mockResolvedValue(completedConversation),
+      });
+
+    const result = await service.confirmAction(
+      { userId, companyId },
+      pendingConversation.id,
+      action.id,
+    );
+
+    expect(employeeConstructor).toHaveBeenCalledWith({
+      name: 'Ana Silva',
+      cpf: '12345678901',
+      companyId,
+      funcao: 'Vendedora',
+    });
+    expect(save).toHaveBeenCalledOnce();
+    expect(result.result).toEqual(createdEmployee);
+    expect(result.assistantMessage).toBe(
+      'Ação create_employee executada com confirmação.',
+    );
+  });
+
+  it('answers WhatsApp contacts with read-only product and sales tools', async () => {
+    fetchMock.mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          choices: [
+            {
+              message: {
+                content: 'Temos cadernos disponíveis.',
+              },
+            },
+          ],
+        }),
+        { status: 200 },
+      ),
+    );
+
+    await expect(
+      service.replyForWhatsApp(
+        { userId, companyId },
+        'Cliente',
+        [{ role: 'user', content: 'Tem caderno?' }],
+      ),
+    ).resolves.toBe('Temos cadernos disponíveis.');
+
+    const requestBody = JSON.parse(
+      fetchMock.mock.calls[0][1].body as string,
+    ) as {
+      messages: Record<string, unknown>[];
+      tools: { function: { name: string } }[];
+    };
+    expect(requestBody.messages[0].content).toContain('EasyBot');
+    expect(requestBody.tools.map((tool) => tool.function.name)).toEqual([
+      'list_products',
+      'list_sales',
+    ]);
   });
 
   it('does not persist an incomplete user message when the provider fails', async () => {

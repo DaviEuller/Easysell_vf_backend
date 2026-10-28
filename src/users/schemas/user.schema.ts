@@ -23,6 +23,12 @@ export class User {
   @Prop({ required: true, select: false })
   passwordHash: string;
 
+  @Prop({ select: false })
+  passwordResetCodeHash?: string;
+
+  @Prop({ select: false })
+  passwordResetCodeExpiresAt?: Date;
+
   // Preenchido depois que a empresa é criada/associada
   @Prop({ type: Types.ObjectId, ref: 'Company', index: true })
   company?: Types.ObjectId;

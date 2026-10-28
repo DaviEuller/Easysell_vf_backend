@@ -12,6 +12,7 @@ import { UpdateUserDto } from './dto/update-user.dto.js';
 import { UserRole } from './enum/user.role.enum.js';
 
 import * as bcrypt from 'bcrypt';
+import { createHash } from 'node:crypto';
 
 @Injectable()
 export class UsersService {
@@ -51,6 +52,25 @@ export class UsersService {
       .findOne({ email })
       .select('+passwordHash')
       .exec();
+  }
+
+  async savePasswordResetCode(email: string, code: string, expiresAt: Date) {
+    const codeHash = createHash('sha256').update(code).digest('hex');
+    return this.userDocument.findOneAndUpdate(
+      { email },
+      { passwordResetCodeHash: codeHash, passwordResetCodeExpiresAt: expiresAt },
+      { returnDocument: 'after' },
+    ).exec();
+  }
+
+  async resetPassword(email: string, code: string, password: string) {
+    const codeHash = createHash('sha256').update(code).digest('hex');
+    const passwordHash = await bcrypt.hash(password, 10);
+    return this.userDocument.findOneAndUpdate(
+      { email, passwordResetCodeHash: codeHash, passwordResetCodeExpiresAt: { $gt: new Date() } },
+      { passwordHash, $unset: { passwordResetCodeHash: 1, passwordResetCodeExpiresAt: 1 } },
+      { returnDocument: 'after' },
+    ).exec();
   }
 
   async remove(id: string): Promise<UserDocument> {

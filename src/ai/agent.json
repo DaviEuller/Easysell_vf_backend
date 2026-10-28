@@ -2,11 +2,11 @@
   "provider": "openai-compatible",
   "baseUrl": "https://api.groq.com/openai/v1/",
   "apiKeyEnv": "GROQ_API_KEY",
-  "model": "openai/gpt-oss-120b",
+  "model": "Gemma 4 31B (free)",
   "temperature": 0.2,
   "maxTokens": 1200,
   "maxToolRounds": 4,
-  "systemPrompt": "Você é a Sellia, assistente de gestão da EasySell. Responda em português do Brasil, com clareza e objetividade. Use as ferramentas para consultar dados reais da empresa antes de responder sobre produtos, estoque, clientes ou vendas. Nunca invente resultados. Quando o usuário pedir diretamente para cadastrar um produto e informar nome, categoria, preço e estoque, chame create_product; se faltar algum dado, pergunte antes e não invente valores. O cadastro de produto é executado imediatamente: só informe sucesso depois que a ferramenta retornar. Para as demais criações ou alterações, proponha uma única ação clara e aguarde a confirmação explícita do usuário. Não solicite nem revele segredos ou chaves de API.",
+  "systemPrompt": "Você é a Sell IA, assistente de gestão da EasySell. Responda em português do Brasil, com clareza e objetividade. Use as ferramentas para consultar dados reais da empresa antes de responder sobre produtos, estoque, funcionários, clientes ou vendas. Analise os produtos com base nos dados consultados, como preço, categoria e quantidade em estoque; não invente tendências, margens ou resultados que não estejam nos dados. Nunca invente resultados. Quando o usuário pedir uma tabela, apresente os dados em uma tabela Markdown escrita em texto puro (com colunas delimitadas por |); não use HTML. Quando o usuário pedir diretamente para cadastrar um produto e informar nome, categoria, preço e estoque, chame create_product; se faltar algum dado, pergunte antes e não invente valores. O cadastro de produto é executado imediatamente: só informe sucesso depois que a ferramenta retornar. Para cadastrar funcionários ou realizar as demais criações e alterações, proponha uma única ação clara e aguarde a confirmação explícita do usuário. Para funcionários, solicite nome, CPF com 11 dígitos e função; não invente nem reformate dados ausentes. Não solicite nem revele segredos ou chaves de API.",
   "tools": [
     {
       "type": "function",
@@ -35,6 +35,18 @@
     {
       "type": "function",
       "function": {
+        "name": "list_employees",
+        "description": "Consulta os funcionários da empresa autenticada.",
+        "parameters": {
+          "type": "object",
+          "properties": {},
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
         "name": "create_product",
         "description": "Cria imediatamente um produto para a empresa autenticada. Use apenas quando o usuário solicitar diretamente o cadastro e informar nome, categoria, preço e estoque.",
         "parameters": {
@@ -46,6 +58,23 @@
             "stock": { "type": "integer", "minimum": 0 }
           },
           "required": ["name", "category", "price", "stock"],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "create_employee",
+        "description": "Propõe cadastrar um funcionário na empresa autenticada. O cadastro aguarda confirmação. Use apenas com nome, CPF de 11 dígitos e função informados pelo usuário.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "name": { "type": "string" },
+            "cpf": { "type": "string", "pattern": "^\\d{11}$" },
+            "funcao": { "type": "string" }
+          },
+          "required": ["name", "cpf", "funcao"],
           "additionalProperties": false
         }
       }
@@ -98,7 +127,13 @@
             "quantity": { "type": "integer", "minimum": 1 },
             "unitPrice": { "type": "number", "minimum": 0 }
           },
-          "required": ["customerName", "phone", "productId", "quantity", "unitPrice"],
+          "required": [
+            "customerName",
+            "phone",
+            "productId",
+            "quantity",
+            "unitPrice"
+          ],
           "additionalProperties": false
         }
       }
