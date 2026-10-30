@@ -15,11 +15,14 @@ import { JwtAuthGuard } from '../auth/jwt.guard.js';
 import { CreateFaturaDto } from './dto/create-fatura.dto.js';
 import { SetFaturaStatusDto } from './dto/set-fatura-status.dto.js';
 import { FaturasService } from './faturas.service.js';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 
 type AuthenticatedRequest = Request & { user: { userId: string } };
 
 @Controller('faturas')
 @UseGuards(JwtAuthGuard)
+@ApiBearerAuth()
+@ApiTags('Faturas')
 export class FaturasController {
   constructor(private readonly faturasService: FaturasService) {}
 

@@ -13,6 +13,7 @@ import type { Request } from 'express';
 import { JwtAuthGuard } from '../auth/jwt.guard.js';
 import { ChatAiDto } from './dto/chat-ai.dto.js';
 import { AiService } from './ai.service.js';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 
 type AuthenticatedRequest = Request & {
   user: {
@@ -24,6 +25,8 @@ type AuthenticatedRequest = Request & {
 
 @Controller('ai')
 @UseGuards(JwtAuthGuard)
+@ApiBearerAuth()
+@ApiTags('Assistente IA')
 export class AiController {
   constructor(private readonly aiService: AiService) {}
 

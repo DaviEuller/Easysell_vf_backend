@@ -21,6 +21,7 @@ import { UpdateEquipeDto } from './dto/update-equipe.dto.js';
 import { CreateEquipeTaskDto } from './dto/create-equipe-task.dto.js';
 import { JwtAuthGuard } from '../auth/jwt.guard.js';
 import type { TaskAttachmentUpload } from './equipe.service.js';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 
 interface AuthenticatedRequest {
   user: {
@@ -30,6 +31,8 @@ interface AuthenticatedRequest {
 
 @Controller('equipe')
 @UseGuards(JwtAuthGuard)
+@ApiBearerAuth()
+@ApiTags('Equipe')
 export class EquipeController {
   constructor(private readonly equipeService: EquipeService) {}
 

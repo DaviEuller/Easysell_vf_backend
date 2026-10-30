@@ -17,6 +17,7 @@ import { CreateEasyBotContactDto } from './dto/create-easybot-contact.dto.js';
 import { SendEasyBotMessageDto } from './dto/send-easybot-message.dto.js';
 import { UpdateEasyBotContactDto } from './dto/update-easybot-contact.dto.js';
 import { EasyBotService } from './easybot.service.js';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 
 type AuthenticatedRequest = Request & {
   user: {
@@ -28,6 +29,8 @@ type AuthenticatedRequest = Request & {
 
 @Controller('easybot')
 @UseGuards(JwtAuthGuard)
+@ApiBearerAuth()
+@ApiTags('EasyBot / WhatsApp')
 export class EasyBotController {
   constructor(private readonly easyBotService: EasyBotService) {}
 
