@@ -9,6 +9,7 @@ import {
 import { ClienteDocument } from '../clientes/Schemas/clientes.schemas.js';
 import { ProdutoDocument } from '../produtos/Schemas/Schemas.produtos.js';
 import { EmployeeDocument } from '../company/schemas/employee.schema.js';
+import { CompanyDocument } from '../company/schemas/company.schema.js';
 import { UserDocument } from '../users/schemas/user.schema.js';
 import { UserRole } from '../users/enum/user.role.enum.js';
 
@@ -41,6 +42,7 @@ describe('AiService', () => {
   let fetchMock: ReturnType<typeof vi.fn>;
   let productModel: Model<ProdutoDocument>;
   let employeeModel: Model<EmployeeDocument>;
+  let companyModel: Model<CompanyDocument>;
   let previousApiKey: string | undefined;
   let previousBaseUrl: string | undefined;
   let previousModel: string | undefined;
@@ -68,11 +70,25 @@ describe('AiService', () => {
     ConversationModelMock.findOneAndUpdate.mockReset();
     productModel = vi.fn() as unknown as Model<ProdutoDocument>;
     employeeModel = vi.fn() as unknown as Model<EmployeeDocument>;
+    companyModel = {
+      findById: vi.fn(() => ({
+        select: vi.fn(() => ({
+          lean: vi.fn(() => ({
+            exec: vi.fn().mockResolvedValue({
+              _id: companyId,
+              name: 'Empresa Teste',
+              categoria: 'Varejo',
+            }),
+          })),
+        })),
+      })),
+    } as unknown as Model<CompanyDocument>;
     service = new AiService(
       ConversationModelMock as unknown as Model<AiConversationDocument>,
       productModel,
       {} as Model<ClienteDocument>,
       employeeModel,
+      companyModel,
       userModel as unknown as Model<UserDocument>,
       {} as never,
     );

@@ -7,16 +7,26 @@ import {
   Param,
   Delete,
   Query,
+  Req,
+  UseGuards,
 } from '@nestjs/common';
 import { CompanyService } from './company.service.js';
 import { CreateCompanyDto } from './dto/create-company.dto.js';
 import { UpdateCompanyDto } from './dto/update-company.dto.js';
-import { ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { JwtAuthGuard } from '../auth/jwt.guard.js';
 
 @Controller('company')
 @ApiTags('Empresas')
 export class CompanyController {
   constructor(private readonly companyService: CompanyService) {}
+
+  @Get('me')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  getMyCompanySummary(@Req() request: { user: { userId: string } }) {
+    return this.companyService.getMyCompanySummary(request.user.userId);
+  }
 
   @Post()
   create(@Body() createCompanyDto: CreateCompanyDto) {

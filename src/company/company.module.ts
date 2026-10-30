@@ -6,6 +6,7 @@ import { CompanyController } from './company.controller.js';
 import { Company, CompanySchema } from './schemas/company.schema.js';
 import { Employee, EmployeeSchema } from './schemas/employee.schema.js';
 import { User, UserSchema } from '../users/schemas/user.schema.js';
+import { Equipe, EquipeSchema } from '../equipe/entities/equipe.entity.js';
 
 @Module({
   imports: [
@@ -21,6 +22,10 @@ import { User, UserSchema } from '../users/schemas/user.schema.js';
       {
         name: User.name,
         schema: UserSchema,
+      },
+      {
+        name: Equipe.name,
+        schema: EquipeSchema,
       },
     ]),
   ],

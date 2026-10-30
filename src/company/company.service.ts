@@ -3,14 +3,16 @@ import {
   ConflictException,
   Injectable,
   NotFoundException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 
 import { Company, CompanyDocument } from './schemas/company.schema.js';
 import { Employee, EmployeeDocument } from './schemas/employee.schema.js';
 import { User, UserDocument } from '../users/schemas/user.schema.js';
 import { UserRole } from '../users/enum/user.role.enum.js';
+import { Equipe, EquipeDocument } from '../equipe/entities/equipe.entity.js';
 import { CreateCompanyDto } from './dto/create-company.dto.js';
 import { UpdateCompanyDto } from './dto/update-company.dto.js';
 
@@ -41,7 +43,61 @@ export class CompanyService {
     private readonly employeeModel: Model<EmployeeDocument>,
     @InjectModel(User.name)
     private readonly userModel: Model<UserDocument>,
+    @InjectModel(Equipe.name)
+    private readonly equipeModel: Model<EquipeDocument>,
   ) {}
+
+  async getMyCompanySummary(userId: string) {
+    if (!userId || !Types.ObjectId.isValid(userId)) {
+      throw new UnauthorizedException('Usuário da sessão inválido.');
+    }
+
+    const user = await this.userModel
+      .findById(userId)
+      .select('name email role company equipeMember')
+      .exec();
+    const companyId = user?.company?.toString();
+    if (!user || !companyId) {
+      throw new UnauthorizedException('Usuário não associado a uma empresa.');
+    }
+
+    const company = await this.companyModel
+      .findById(companyId)
+      .select('name categoria')
+      .exec();
+    if (!company) {
+      throw new NotFoundException('Empresa associada não encontrada.');
+    }
+
+    const equipeMember = user.equipeMember
+      ? await this.equipeModel
+          .findOne({ _id: user.equipeMember, companyId })
+          .select('funcao')
+          .exec()
+      : await this.equipeModel
+          .findOne({ userId, companyId })
+          .select('funcao')
+          .exec();
+    const employee = equipeMember
+      ? null
+      : await this.employeeModel
+          .findOne({ userId, companyId })
+          .select('funcao')
+          .exec();
+
+    return {
+      empresa: { nome: company.name, categoria: company.categoria },
+      usuario: {
+        nome: user.name,
+        email: user.email,
+        role: user.role,
+        cargo:
+          equipeMember?.funcao ??
+          employee?.funcao ??
+          (user.role === UserRole.ADMINISTRADOR ? 'Administrador' : user.role),
+      },
+    };
+  }
 
   async create(createCompanyDto: CreateCompanyDto): Promise<CompanyDocument> {
     const responsible = await this.userModel

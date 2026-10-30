@@ -14,6 +14,7 @@ import {
   Employee,
   EmployeeSchema,
 } from '../company/schemas/employee.schema.js';
+import { Company, CompanySchema } from '../company/schemas/company.schema.js';
 import { AiController } from './ai.controller.js';
 import { AiService } from './ai.service.js';
 import {
@@ -29,6 +30,7 @@ import {
       { name: Produto.name, schema: ProdutoSchema },
       { name: Cliente.name, schema: ClienteSchema },
       { name: Employee.name, schema: EmployeeSchema },
+      { name: Company.name, schema: CompanySchema },
       { name: User.name, schema: UserSchema },
     ]),
   ],

@@ -4,6 +4,7 @@ import { ConflictException, NotFoundException } from '@nestjs/common';
 import { Company } from './schemas/company.schema.js';
 import { Employee } from './schemas/employee.schema.js';
 import { User } from '../users/schemas/user.schema.js';
+import { Equipe } from '../equipe/entities/equipe.entity.js';
 import { UserRole } from '../users/enum/user.role.enum.js';
 import { CompanyService } from './company.service.js';
 
@@ -42,6 +43,10 @@ describe('CompanyService', () => {
             findById: findUserById,
             findByIdAndUpdate: updateUserById,
           },
+        },
+        {
+          provide: getModelToken(Equipe.name),
+          useValue: {},
         },
       ],
     }).compile();
