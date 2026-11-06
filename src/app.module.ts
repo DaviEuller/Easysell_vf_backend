@@ -13,6 +13,8 @@ import { EquipeModule } from './equipe/equipe.module.js';
 import { AiModule } from './ai/ai.module.js';
 import { FaturasModule } from './faturas/faturas.module.js';
 import { EasyBotModule } from './easybot/easybot.module.js';
+import { MercadoLivreModule } from './mercadolivre/mercadolivre.module.js';
+import { InvoiceImportModule } from './invoice-import/invoice-import.module.js';
 export const { ObserveModule, ObserveInstrument } = createObserveModule();
 
 @Module({
@@ -46,6 +48,10 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
     FaturasModule,
 
     EasyBotModule,
+
+    MercadoLivreModule,
+
+    InvoiceImportModule,
   ],
   controllers: [AppController],
   providers: [AppService],

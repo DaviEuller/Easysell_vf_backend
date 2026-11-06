@@ -52,8 +52,20 @@ type ClientRuntime = {
   disconnecting: boolean;
 };
 
+const MAX_CLIENT_INITIALIZATION_ATTEMPTS = 3;
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
+}
+
+function isNavigationContextError(error: unknown): boolean {
+  const message =
+    error instanceof Error
+      ? error.message
+      : typeof error === 'string'
+        ? error
+        : '';
+  return message.includes('Execution context was destroyed');
 }
 
 function normalizePhone(value: string): string {
@@ -151,7 +163,11 @@ export class EasyBotService implements OnModuleInit, OnModuleDestroy {
         {
           $set: { status: 'connecting', lastError: null },
         },
-        { new: true, upsert: true, setDefaultsOnInsert: true },
+        {
+          returnDocument: 'after',
+          upsert: true,
+          setDefaultsOnInsert: true,
+        },
       )
       .exec();
 
@@ -269,7 +285,7 @@ export class EasyBotService implements OnModuleInit, OnModuleDestroy {
         .findOneAndUpdate(
           { _id: contactId, companyId: scope.companyId },
           { $set: updates },
-          { new: true, runValidators: true },
+          { returnDocument: 'after', runValidators: true },
         )
         .exec();
       if (!contact) throw new NotFoundException('Contato não encontrado.');
@@ -311,18 +327,40 @@ export class EasyBotService implements OnModuleInit, OnModuleDestroy {
   async sendMessage(user: AuthenticatedUser, dto: SendEasyBotMessageDto) {
     const scope = await this.getAdminScope(user);
     const contact = await this.findContact(scope.companyId, dto.contactId);
-    const runtime = this.clients.get(scope.companyId);
+    return this.sendToContact(scope.companyId, contact, dto.message);
+  }
+
+  async sendMessageForAi(
+    companyId: string,
+    contactId: string,
+    content: string,
+  ) {
+    const contact = await this.findContact(companyId, contactId);
+    return this.sendToContact(companyId, contact, content);
+  }
+
+  private async sendToContact(
+    companyId: string,
+    contact: EasyBotContactDocument,
+    rawContent: string,
+  ) {
+    const runtime = this.clients.get(companyId);
     if (!runtime || runtime.status !== 'ready') {
       throw new ConflictException(
         'Conecte o WhatsApp antes de enviar mensagens.',
       );
     }
-    const content = dto.message.trim();
+    const content = rawContent.trim();
     if (!content)
       throw new BadRequestException('A mensagem não pode estar vazia.');
+    if (content.length > 4096) {
+      throw new BadRequestException(
+        'A mensagem não pode ultrapassar 4096 caracteres.',
+      );
+    }
 
     const message = new this.messageModel({
-      companyId: scope.companyId,
+      companyId,
       contactId: contact._id,
       phone: contact.phone,
       direction: 'outgoing',
@@ -400,7 +438,10 @@ export class EasyBotService implements OnModuleInit, OnModuleDestroy {
     return contact;
   }
 
-  private async initializeClient(companyId: string) {
+  private async initializeClient(
+    companyId: string,
+    attempt = 1,
+  ): Promise<ClientRuntime> {
     const existing = this.clients.get(companyId);
     if (existing) return existing;
 
@@ -426,6 +467,7 @@ export class EasyBotService implements OnModuleInit, OnModuleDestroy {
     this.clients.set(companyId, runtime);
 
     client.on('qr', (qr: string) => {
+      if (this.clients.get(companyId) !== runtime) return;
       runtime.status = 'qr';
       runtime.qrCodeDataUrl = undefined;
       this.updateAccount(companyId, {
@@ -446,6 +488,7 @@ export class EasyBotService implements OnModuleInit, OnModuleDestroy {
         });
     });
     client.on('authenticated', () => {
+      if (this.clients.get(companyId) !== runtime) return;
       runtime.status = 'connecting';
       runtime.qrCodeDataUrl = undefined;
       this.updateAccount(companyId, {
@@ -454,6 +497,7 @@ export class EasyBotService implements OnModuleInit, OnModuleDestroy {
       }).catch((error: unknown) => this.logClientError(companyId, error));
     });
     client.on('ready', () => {
+      if (this.clients.get(companyId) !== runtime) return;
       runtime.status = 'ready';
       runtime.qrCodeDataUrl = undefined;
       const phoneNumber = client.info.wid.user;
@@ -465,6 +509,7 @@ export class EasyBotService implements OnModuleInit, OnModuleDestroy {
       }).catch((error: unknown) => this.logClientError(companyId, error));
     });
     client.on('auth_failure', (message: string) => {
+      if (this.clients.get(companyId) !== runtime) return;
       runtime.status = 'error';
       runtime.qrCodeDataUrl = undefined;
       this.updateAccount(companyId, {
@@ -473,6 +518,7 @@ export class EasyBotService implements OnModuleInit, OnModuleDestroy {
       }).catch((error: unknown) => this.logClientError(companyId, error));
     });
     client.on('disconnected', (reason: string) => {
+      if (this.clients.get(companyId) !== runtime) return;
       runtime.status = 'disconnected';
       runtime.qrCodeDataUrl = undefined;
       if (this.clients.get(companyId) === runtime) {
@@ -486,6 +532,7 @@ export class EasyBotService implements OnModuleInit, OnModuleDestroy {
       }
     });
     client.on('message', (message: WhatsAppMessage) => {
+      if (this.clients.get(companyId) !== runtime) return;
       this.handleIncomingMessage(companyId, message).catch((error: unknown) => {
         this.logger.error(
           `Não foi possível processar uma mensagem recebida pelo EasyBot da empresa ${companyId}.`,
@@ -509,6 +556,20 @@ export class EasyBotService implements OnModuleInit, OnModuleDestroy {
           `Não foi possível encerrar uma inicialização incompleta do EasyBot para a empresa ${companyId}.`,
           destroyError instanceof Error ? destroyError.stack : undefined,
         );
+      }
+      if (
+        isNavigationContextError(error) &&
+        attempt < MAX_CLIENT_INITIALIZATION_ATTEMPTS
+      ) {
+        this.logger.warn(
+          `A página do WhatsApp navegou durante a inicialização da empresa ${companyId}; tentando novamente (${attempt + 1}/${MAX_CLIENT_INITIALIZATION_ATTEMPTS}).`,
+        );
+        await this.updateAccount(companyId, {
+          status: 'connecting',
+          lastError: null,
+        });
+        await new Promise((resolve) => setTimeout(resolve, attempt * 1000));
+        return this.initializeClient(companyId, attempt + 1);
       }
       const detail =
         error instanceof Error
@@ -541,7 +602,7 @@ export class EasyBotService implements OnModuleInit, OnModuleDestroy {
     }
     const phone = normalizePhone(incoming.from.slice(0, -5));
     const contact = await this.contactModel
-      .findOne({ companyId, phone, autoReplyEnabled: true })
+      .findOne({ companyId, phone })
       .exec();
     if (!contact) return;
 
@@ -554,6 +615,7 @@ export class EasyBotService implements OnModuleInit, OnModuleDestroy {
       status: 'received',
     });
     await receivedMessage.save();
+    if (!contact.autoReplyEnabled) return;
 
     const recentMessages = await this.messageModel
       .find({ companyId, contactId: contact._id })

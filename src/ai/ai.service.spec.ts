@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { Model, Types } from 'mongoose';
 import { vi } from 'vitest';
 import { AiService } from './ai.service.js';
@@ -15,6 +16,9 @@ import { UserRole } from '../users/enum/user.role.enum.js';
 
 const companyId = '507f1f77bcf86cd799439011';
 const userId = '507f1f77bcf86cd799439012';
+const agentConfig = JSON.parse(
+  readFileSync(new URL('./agent.json', import.meta.url), 'utf8'),
+) as { model: string };
 
 class ConversationModelMock {
   static findOne = vi.fn();
@@ -90,6 +94,8 @@ describe('AiService', () => {
       employeeModel,
       companyModel,
       userModel as unknown as Model<UserDocument>,
+      {} as never,
+      {} as never,
       {} as never,
     );
   });
@@ -178,12 +184,122 @@ describe('AiService', () => {
       fetchMock.mock.calls[0][1].body as string,
     ) as { model: string; messages: Record<string, unknown>[] };
     expect(requestBody.model).toBe(
-      process.env.AI_MODEL?.trim() || 'openai/gpt-oss-120b',
+      process.env.AI_MODEL?.trim() || agentConfig.model,
     );
     expect(requestBody.messages[1]).toEqual({
       role: 'user',
       content: 'Cadastre um caderno.',
     });
+  });
+
+  it('proposes a Mercado Livre listing and waits for administrator confirmation', async () => {
+    fetchMock.mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          choices: [
+            {
+              message: {
+                content: null,
+                tool_calls: [
+                  {
+                    id: 'call_marketplace_product',
+                    function: {
+                      name: 'create_marketplace_product',
+                      arguments: JSON.stringify({
+                        name: 'Caderno',
+                        category: 'Papelaria',
+                        price: 39.9,
+                        stock: 5,
+                        listing: {
+                          categoryId: 'MLB1234',
+                          condition: 'new',
+                          listingTypeId: 'gold_special',
+                          pictures: ['https://cdn.example.test/caderno.jpg'],
+                          shippingMode: 'me2',
+                          freeShipping: false,
+                          localPickup: false,
+                          attributes: [],
+                        },
+                      }),
+                    },
+                  },
+                ],
+              },
+            },
+          ],
+        }),
+        { status: 200 },
+      ),
+    );
+
+    const result = await service.chat(
+      { userId, companyId },
+      'Cadastre este produto no Mercado Livre.',
+    );
+
+    expect(result.pendingAction).toMatchObject({
+      name: 'create_marketplace_product',
+      status: 'pending',
+      arguments: {
+        name: 'Caderno',
+        listing: { categoryId: 'MLB1234' },
+      },
+    });
+
+    const action = result.pendingAction as PendingAiAction;
+    const pendingConversation = new ConversationModelMock({
+      pendingAction: action,
+      userId,
+      companyId,
+    });
+    const executingConversation = new ConversationModelMock({
+      pendingAction: { ...action, status: 'executing' },
+      userId,
+      companyId,
+    });
+    const completedConversation = new ConversationModelMock({
+      pendingAction: null,
+      userId,
+      companyId,
+    });
+    const publicationResult = {
+      productId: '507f1f77bcf86cd799439016',
+      publication: { status: 'published', itemId: 'MLB1234567890' },
+    };
+    const publishProduct = vi.fn().mockResolvedValue(publicationResult);
+    Object.assign(service, {
+      moduleRef: {
+        get: vi.fn(() => ({ createAndPublishProduct: publishProduct })),
+      },
+    });
+    ConversationModelMock.findOne.mockReturnValue({
+      exec: vi.fn().mockResolvedValue(pendingConversation),
+    });
+    ConversationModelMock.findOneAndUpdate
+      .mockReturnValueOnce({
+        exec: vi.fn().mockResolvedValue(executingConversation),
+      })
+      .mockReturnValueOnce({
+        exec: vi.fn().mockResolvedValue(completedConversation),
+      });
+
+    const confirmed = await service.confirmAction(
+      { userId, companyId },
+      result.conversation.id,
+      action.id,
+    );
+
+    expect(publishProduct).toHaveBeenCalledWith(
+      { userId, companyId },
+      expect.objectContaining({
+        name: 'Caderno',
+        listing: expect.objectContaining({ categoryId: 'MLB1234' }),
+      }),
+    );
+    expect(confirmed.result).toEqual(publicationResult);
+    expect(confirmed.assistantMessage).toBe(
+      'Produto cadastrado e anúncio publicado no Mercado Livre.',
+    );
   });
 
   it('rejects an authenticated company ID that differs from the user record', async () => {
@@ -332,11 +448,9 @@ describe('AiService', () => {
     );
 
     await expect(
-      service.replyForWhatsApp(
-        { userId, companyId },
-        'Cliente',
-        [{ role: 'user', content: 'Tem caderno?' }],
-      ),
+      service.replyForWhatsApp({ userId, companyId }, 'Cliente', [
+        { role: 'user', content: 'Tem caderno?' },
+      ]),
     ).resolves.toBe('Temos cadernos disponíveis.');
 
     const requestBody = JSON.parse(
@@ -350,6 +464,140 @@ describe('AiService', () => {
       'list_products',
       'list_sales',
     ]);
+  });
+
+  it('proposes WhatsApp messages for administrator confirmation', async () => {
+    fetchMock.mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          choices: [
+            {
+              message: {
+                content: null,
+                tool_calls: [
+                  {
+                    id: 'call_send_whatsapp',
+                    function: {
+                      name: 'send_whatsapp_message',
+                      arguments: JSON.stringify({
+                        contactId: '507f1f77bcf86cd799439015',
+                        message: 'Seu pedido está pronto.',
+                      }),
+                    },
+                  },
+                ],
+              },
+            },
+          ],
+        }),
+        { status: 200 },
+      ),
+    );
+
+    const result = await service.chat(
+      { userId, companyId },
+      'Avise a Maria que o pedido está pronto.',
+    );
+
+    expect(result.pendingAction).toMatchObject({
+      name: 'send_whatsapp_message',
+      status: 'pending',
+      arguments: {
+        contactId: '507f1f77bcf86cd799439015',
+        message: 'Seu pedido está pronto.',
+      },
+    });
+    const requestBody = JSON.parse(
+      fetchMock.mock.calls[0][1].body as string,
+    ) as { tools: { function: { name: string } }[] };
+    expect(requestBody.tools.map((tool) => tool.function.name)).toContain(
+      'send_whatsapp_message',
+    );
+  });
+
+  it('suggests invoice matches only from the company catalog and returns structured review items', async () => {
+    const productId = new Types.ObjectId('507f1f77bcf86cd799439015');
+    const query = {
+      select: vi.fn(),
+      sort: vi.fn(),
+      limit: vi.fn(),
+      lean: vi.fn(),
+      exec: vi.fn().mockResolvedValue([
+        {
+          _id: productId,
+          name: 'Caneca de cerâmica',
+          categoria: 'Casa',
+          preco: 30,
+        },
+      ]),
+    };
+    query.select.mockReturnValue(query);
+    query.sort.mockReturnValue(query);
+    query.limit.mockReturnValue(query);
+    query.lean.mockReturnValue(query);
+    Object.assign(productModel, {
+      find: vi.fn().mockReturnValue(query),
+    });
+    fetchMock.mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          choices: [
+            {
+              message: {
+                content: JSON.stringify({
+                  items: [
+                    {
+                      description: 'Caneca de cerâmica',
+                      quantity: 2,
+                      unitPrice: 15,
+                      total: 30,
+                      productId: null,
+                      confidence: 0.72,
+                      clarification: null,
+                    },
+                  ],
+                  answer: 'Encontrei uma correspondência provável.',
+                }),
+              },
+            },
+          ],
+        }),
+      ),
+    );
+
+    await expect(
+      service.assistInvoiceReview(
+        { userId },
+        {
+          items: [],
+          ocrLines: ['Caneca cerâmica 2 un. R$ 15,00 R$ 30,00'],
+          question: 'Confira o valor total.',
+        },
+      ),
+    ).resolves.toEqual({
+      items: [
+        {
+          description: 'Caneca de cerâmica',
+          quantity: 2,
+          unitPrice: 15,
+          total: 30,
+          productId: productId.toString(),
+          confidence: 0.9,
+        },
+      ],
+      answer: 'Encontrei uma correspondência provável.',
+      needsClarification: false,
+      clarificationQuestion: null,
+    });
+
+    const requestBody = JSON.parse(
+      fetchMock.mock.calls[0][1].body as string,
+    ) as { tools: unknown[]; messages: { content: string }[] };
+    expect(requestBody.tools).toEqual([]);
+    expect(requestBody.messages[1].content).toContain(
+      'Caneca cerâmica 2 un. R$ 15,00 R$ 30,00',
+    );
+    expect(requestBody.messages[1].content).toContain(productId.toString());
   });
 
   it('does not persist an incomplete user message when the provider fails', async () => {

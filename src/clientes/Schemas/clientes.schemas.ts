@@ -8,8 +8,8 @@ export class Cliente {
   @Prop({ required: true })
   name: string;
 
-  @Prop({ required: true })
-  Numero: string;
+  @Prop({ type: String })
+  Numero?: string;
 
   @Prop({ required: true })
   IdProduto: string;

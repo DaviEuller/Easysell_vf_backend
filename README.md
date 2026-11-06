@@ -76,10 +76,13 @@ usuário autenticado. A sessão WhatsApp é salva localmente pela estratégia
 `LocalAuth`; configure `WHATSAPP_SESSION_PATH` para um volume persistente no
 servidor. Execute apenas uma instância do backend por pasta de sessão.
 
-O EasyBot envia mensagens para contatos cadastrados e só responde
+O EasyBot registra mensagens recebidas de contatos cadastrados e responde
 automaticamente aos contatos com resposta automática ativada. Essas respostas
 usam a Sell IA para consultar produtos e vendas, sem ferramentas de escrita.
-Configure `GROQ_API_KEY` como no recurso Sell IA. O Chrome/Chromium precisa
+No chat `/ai/chat`, a Sell IA também pode preparar mensagens para contatos do
+WhatsApp cadastrados; um administrador precisa confirmar a ação pendente antes
+do envio, e a sessão WhatsApp da empresa deve estar conectada. Configure
+`GROQ_API_KEY` como no recurso Sell IA. O Chrome/Chromium precisa
 estar instalado no servidor; instale o Chrome gerenciado pelo Puppeteer com
 `npx puppeteer browsers install chrome` ou configure
 `PUPPETEER_EXECUTABLE_PATH` com o caminho de um navegador instalado.
@@ -89,6 +92,119 @@ Rotas protegidas por JWT: `GET /easybot/status`, `POST /easybot/connect`,
 `PATCH|DELETE /easybot/contacts/:contactId`,
 `GET /easybot/contacts/:contactId/messages` e `POST /easybot/messages`.
 O envio exige uma conexão ativa e um contato cadastrado.
+
+## Mercado Livre — compras
+
+A integração conecta uma conta compradora por OAuth. Configure
+`MERCADOLIVRE_CLIENT_ID`, `MERCADOLIVRE_CLIENT_SECRET`,
+`MERCADOLIVRE_REDIRECT_URI` (a mesma URL cadastrada na aplicação do Mercado
+Livre, terminando em `/mercadolivre/oauth/callback`) e
+`MERCADOLIVRE_TOKEN_ENCRYPTION_KEY` (chave Base64 de 32 bytes). Gere a chave
+com `node -e "console.log(require('node:crypto').randomBytes(32).toString('base64'))"`.
+Tokens OAuth são criptografados antes de serem salvos no MongoDB. Configure
+essas variáveis somente no ambiente do servidor; nunca use `.env.example` para
+guardar credenciais reais.
+
+Um administrador usa `POST /mercadolivre/connect` e abre a `authorizationUrl`
+retornada para autorizar a conta. Pedidos de compra e documentos fiscais
+disponíveis são sincronizados imediatamente após a conexão e a cada 15 minutos.
+Também é possível iniciar a sincronização com `POST /mercadolivre/sync`.
+Compras ficam separadas das faturas a receber em
+`GET /mercadolivre/purchases`; o estado de documento fiscal pode ser
+`available`, `not_available` ou `unavailable` (quando o Mercado Livre não
+permite a consulta). O arquivo fiscal, quando disponível, pode ser baixado em
+`GET /mercadolivre/purchases/:purchaseId/fiscal-documents/:documentId`.
+`GET /mercadolivre/status` mostra a conexão e o resultado da última
+sincronização; `DELETE /mercadolivre/connect` revoga localmente a conexão e
+remove os tokens guardados.
+
+Para publicar produtos, a conta autorizada também precisa ter permissão de
+vendedor. Produtos EasySell aceitam `mercadoLivreListing` com `categoryId`,
+`condition`, `listingTypeId`, URLs públicas em `pictures`, `shippingMode`,
+`freeShipping`, `localPickup` e, quando a categoria solicitar, `attributes`.
+Quando esses dados estiverem completos, o cadastro/edição do produto inicia a
+publicação automática; produtos configurados antes de conectar a conta ficam
+pendentes e são tentados novamente durante a sincronização periódica.
+Alternativamente, `POST /mercadolivre/products/:productId/publish` grava os
+dados de anúncio e publica um produto existente. Use
+`GET /mercadolivre/categories/:categoryId/attributes` para consultar os
+atributos exigidos para uma categoria. O ID do anúncio, permalink e erro de
+publicação ficam em `mercadoLivreListing` no produto. Atualizações de preço e
+estoque em `PATCH /produtos/:id` são propagadas para um anúncio já publicado.
+
+A Sell IA também pode propor o cadastro de um produto com anúncio no Mercado
+Livre. Informe nome, categoria EasySell, preço, estoque, categoria/condição/tipo
+de anúncio, URLs HTTPS das imagens, frete e atributos necessários. A ação exige
+confirmação explícita de um administrador; sem conta conectada, o produto é
+cadastrado e a publicação permanece pendente para nova tentativa.
+
+## Importação de vendas por nota fiscal
+
+`POST /invoice-imports` recebe um único arquivo multipart no campo `file`
+(NF-e XML, PDF ou foto PNG/JPG/WEBP, até 10 MB). O XML NF-e é lido diretamente;
+PDFs e imagens usam OCR Tesseract local em português. Na primeira utilização,
+o Tesseract pode baixar os dados de idioma português no servidor. PDFs com
+camada de texto inválida ou insuficiente também passam pelo OCR. O arquivo
+original não é armazenado, mas os campos extraídos e o texto OCR ficam salvos
+para conferência.
+
+Cada envio cria uma importação `pending_review`, sem registrar venda nem alterar
+estoque. Consulte `GET /invoice-imports?status=pending_review` e use
+`POST /invoice-imports/:invoiceId/assist` para solicitar a análise da Sell IA.
+Ela extrai linhas candidatas dos PDFs/imagens, sugere correspondências do
+catálogo da empresa e valores legíveis; uma pergunta opcional no corpo permite
+tirar dúvidas sobre a nota. O endpoint não registra vendas.
+
+A IA recebe somente linhas candidatas de itens e dados do catálogo da empresa,
+nunca o OCR completo nem os dados cadastrais do cliente. As sugestões, com
+confiança e possíveis dúvidas, são editáveis e devem ser conferidas por uma
+pessoa. Itens e preços não identificados podem ser preenchidos manualmente.
+Para preparar uma revisão sem nota, use `POST /invoice-imports/manual` com o
+cliente e os itens escolhidos no catálogo da própria empresa. Esse endpoint cria
+uma revisão pendente, sem registrar venda nem alterar estoque:
+
+```json
+{
+  "customerName": "João da Silva",
+  "customerPhone": "+5511999999999",
+  "items": [
+    {
+      "productId": "665f1a2b3c4d5e6f7a8b9c0d",
+      "quantity": 2,
+      "unitPrice": 79.9
+    }
+  ]
+}
+```
+
+Confirme com
+`POST /invoice-imports/:invoiceId/confirm` e um corpo como:
+
+```json
+{
+  "confirmAsSale": true,
+  "customerName": "João da Silva",
+  "customerPhone": "+5511999999999",
+  "items": [
+    {
+      "productId": "665f1a2b3c4d5e6f7a8b9c0d",
+      "quantity": 2,
+      "unitPrice": 79.9
+    }
+  ]
+}
+```
+
+O nome pode vir da NF-e; informe-o se estiver ausente. O telefone é opcional
+para vendas importadas. A confirmação cria uma venda EasySell por item, baixa o
+estoque e marca a importação como `imported` dentro de uma transação MongoDB.
+O campo `confirmAsSale: true` confirma que a nota representa uma saída/venda;
+NF-e XML identificada como entrada é recusada automaticamente.
+NF-e com chave de acesso repetida na mesma empresa não pode ser importada de
+novo. Uma importação pendente pode ser recusada em
+`POST /invoice-imports/:invoiceId/reject`. Notas em PDF/imagem não têm as linhas
+de produto confirmadas automaticamente: revise as sugestões, corrija os valores
+ou preencha os itens manualmente antes de confirmar.
 
 ## Vendas parceladas e faturas
 
@@ -201,3 +317,109 @@ Nest is an MIT-licensed open source project. It can grow thanks to the sponsors 
 
 Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
 "# Easysell_vf_backend"
+
+https://easy-sell-vf.vercel.app/ VICTOR-silva300
+ThalesRangon
+
+https://github.com/DaviEuller/Easysell_vf_backend
+
+JWT_SECRET = "YUEWEWHIGWEIUGFEWhbduwguegcywgcyuFUDCWUEGCUYGygUGYQUFYGCEWUGFVCWQYHIQUHguygdvcuewgcwgcugw3879y48u2iej"
+MONGODB_URI="mongodb+srv://davieuller01_db_user:hWXVhvPcM3mCUETD@easysell.4ryznpa.mongodb.net/Easysell"
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+# EasySell — Backend (API REST)
+
+API REST do sistema **EasySell**, desenvolvida em **NestJS**, responsável por gerenciar produtos, estoque, vendas, financeiro, equipe, assistente de IA (Sell IA) e integração com WhatsApp (EasyBot).
+
+Esta API é consumida tanto pelo aplicativo mobile (Flutter) quanto pelo frontend web (React).
+
+---
+
+## Tecnologias
+
+- **NestJS 12** + Node.js + TypeScript
+- **MongoDB** (Atlas) com Mongoose
+- **JWT** + Passport + bcrypt
+- **Swagger** (documentação da API)
+- **Vitest** + Supertest (testes)
+- Integrações:
+  - Groq (Chat Completions) — Sell IA
+  - EmailJS — recuperação de senha
+  - whatsapp-web.js — EasyBot
+
+---
+
+## Funcionalidades principais
+
+- Autenticação (login, cadastro e recuperação de senha)
+- Gestão de empresa, produtos e estoque
+- Registro de vendas e clientes (incluindo vendas parceladas)
+- Controle de faturas e parcelas
+- Gestão de equipe e tarefas
+- Assistente de IA (Sell IA) com ferramentas de leitura e escrita (com confirmação)
+- EasyBot (WhatsApp) com resposta automática
+- Isolamento de dados por empresa
+- Controle de perfis (administrador, atendente e funcionário)
+
+---
+
+## Pré-requisitos
+
+- Node.js 24+
+- npm
+- Conta no MongoDB Atlas (ou MongoDB com replica set)
+- (Opcional) Chave de API do Groq, conta no EmailJS e Chrome/Chromium (para o EasyBot)
+
+---
+
+## Instalação e execução
+
+```bash
+# Clone o repositório
+git clone <url-do-repositorio>
+cd Easysell_vf_backend
+
+# Instale as dependências
+npm install
+
+# Configure as variáveis de ambiente
+cp .env.example .env
+# Edite o arquivo .env com seus valores
+
+# Desenvolvimento
+npm run start:dev
+
+# Produção
+npm run build
+npm run start:prod
+
+A API sobe em: http://localhost:3000
+
+Documentação Swagger: http://localhost:3000/api
+
+Variáveis de ambiente
+
+| Variável | Descrição |
+| --- | --- |
+| MONGODB_URI | String de conexão com o MongoDB |
+| JWT_SECRET | Segredo para assinar os tokens JWT |
+| AI_API_BASE_URL | URL base do provedor de IA |
+| GROQ_API_KEY | Chave da API do Groq |
+| AI_MODEL | Modelo de IA utilizado |
+| EMAILJS_PUBLIC_KEY | Chave pública do EmailJS |
+| EMAILJS_PRIVATE_KEY | Chave privada do EmailJS |
+| EMAILJS_SERVICE_ID | ID do serviço EmailJS |
+| EMAILJS_TEMPLATE_ID | ID do template de e-mail |
+| WHATSAPP_SESSION_PATH | Caminho da sessão do WhatsApp |
+| PUPPETEER_EXECUTABLE_PATH | Caminho do Chrome/Chromium |
+| PORT | Porta do servidor (padrão: 3000) |
+
+
+
+Segurança
+Senhas armazenadas com bcrypt
+Autenticação via JWT (validade de 1 dia)
+Isolamento de dados por empresa (companyId do token)
+Ações de escrita da IA exigem confirmação do administrador
+Credenciais e segredos apenas em variáveis de ambiente
+```

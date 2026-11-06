@@ -37,8 +37,8 @@ consume estas rotas via JWT. Trabalha sobre MongoDB (Mongoose) e usa
    - `test/app.e2e-spec.ts` importa `supertest/types` (`App`) e espera
      `GET /` retornar `"Hello World!"` — mas o backend não tem controller raiz
      nem rota `GET /` retornando texto. O e2e precisa de um MongoDB real ou de
-   mock de providers; o erro de importação do tipo do `supertest` também vale
-   conferir (instalado, mas falta export).
+     mock de providers; o erro de importação do tipo do `supertest` também vale
+     conferir (instalado, mas falta export).
    - `src/auth/...` e `src/users/...` specs e `_controller_`/`_service_` specs
      falham com "Nest can't resolve dependencies" — providers de modelo Mongoose
      não são fornecidos no módulo de teste. Precisa de `useValue`/`useClass`
@@ -96,67 +96,107 @@ Convenção: cada módulo em `src/<modulo>/` com `.controller.ts`, `.service.ts`
 
 ## Env vars (.env.example)
 
-| Var | Uso |
-|-----|-----|
-| `MONGODB_URI` | Conexão Mongo (Atlas replica set recomendado para transações). |
-| `JWT_SECRET` | Segredo do JWT (longo e aleatório). |
-| `AI_API_BASE_URL` | Base URL do provedor OpenAI-compatible (padrão Groq). |
-| `GROQ_API_KEY` | Chave do provedor (padrão no agent.json). |
-| `AI_MODEL` | Override do modelo (padrão `Gemma 4 31B (free)` em agent.json). |
-| `WHATSAPP_SESSION_PATH` | Pasta de sessão LocalAuth do WhatsApp (persistir em volume). |
-| `PUPPETEER_EXECUTABLE_PATH` | Chrome/Chromium para o whatsapp-web.js. |
-| `OBSERVE_KEY` / `OBSERVE_SECRET` | (quando habilitado) credenciais do @nestjs/observe. |
+| Var                                                     | Uso                                                                 |
+| ------------------------------------------------------- | ------------------------------------------------------------------- |
+| `MONGODB_URI`                                           | Conexão Mongo (Atlas replica set recomendado para transações).      |
+| `JWT_SECRET`                                            | Segredo do JWT (longo e aleatório).                                 |
+| `AI_API_BASE_URL`                                       | Base URL do provedor OpenAI-compatible (padrão Groq).               |
+| `GROQ_API_KEY`                                          | Chave do provedor (padrão no agent.json).                           |
+| `AI_MODEL`                                              | Override do modelo (padrão `Gemma 4 31B (free)` em agent.json).     |
+| `WHATSAPP_SESSION_PATH`                                 | Pasta de sessão LocalAuth do WhatsApp (persistir em volume).        |
+| `PUPPETEER_EXECUTABLE_PATH`                             | Chrome/Chromium para o whatsapp-web.js.                             |
+| `OBSERVE_KEY` / `OBSERVE_SECRET`                        | (quando habilitado) credenciais do @nestjs/observe.                 |
+| `MERCADOLIVRE_CLIENT_ID` / `MERCADOLIVRE_CLIENT_SECRET` | Credenciais OAuth da aplicação Mercado Livre.                       |
+| `MERCADOLIVRE_REDIRECT_URI`                             | Callback OAuth público configurado na aplicação Mercado Livre.      |
+| `MERCADOLIVRE_TOKEN_ENCRYPTION_KEY`                     | Chave Base64 de 32 bytes para criptografar tokens OAuth no MongoDB. |
 
 ## Rotas da API
 
 ### Auth
+
 - `POST /auth/login` → `{ accessToken }`
 
 ### Produtos (`User` role livre)
+
 - `GET /produtos`, `GET /produtos/:id`, `POST /produtos`,
   `PATCH /produtos/:id`, `DELETE /produtos/:id`
 - Escopo: filtra/cria por `companyId` do usuário autenticado.
 
 ### Clientes / vendas
+
 - `GET /clientes`, `POST /clientes`, `PATCH /clientes/:id`,
   `DELETE /clientes/:id`
 - Venda com parcelamento: `parcelas`, `valorPago`,
   `dataPrimeiroVencimento` (ISO). `saldoPendente` calculado no backend.
 
 ### Empresa / funcionários
+
 - CRUD empresa e funcionário; CPF único por empresa via `Employee` schema.
 
 ### Equipe
+
 - `GET /equipe`, `POST /equipe`, `PATCH /equipe/:id`, `DELETE /equipe/:id`
   (tarefas).
 
 ### Sell IA (`GET /ai/*`, JWT)
+
 - `GET /ai/conversations` — lista (`_id, title, updatedAt, lastMessage,
-  pendingAction`).
+pendingAction`).
 - `GET /ai/conversations/:id` — detalhe (mensagens sem role tool).
 - `POST /ai/chat` — body `{ message, conversationId? }`.
 - `POST /ai/conversations/:id/actions/:actionId/confirm|reject`.
 - Regras: leitura sem confirmação (produtos, vendas, funcionários); escrita
   (`create_product`, `create_employee`, `create_sale`, `update_product`,
-  `set_product_stock`, `update_customer`, `update_sale`) pende de confirmação
-  de administrador. `create_product` executa imediatamente.
+  `set_product_stock`, `update_customer`, `update_sale`,
+  `send_whatsapp_message`) pende de confirmação de administrador.
+  `create_product` executa imediatamente. `send_whatsapp_message` só usa
+  contatos cadastrados da empresa e requer sessão EasyBot conectada.
 - Transações Mongo (`create_sale`, `update_sale`) exigem replica set.
 
 ### Faturas (`GET|POST|PATCH /faturas*`, JWT)
+
 - `GET /faturas`, `GET /faturas/vendas-disponiveis`, `POST /faturas`
   (`{ saleId, dueDate? }`).
 - `PATCH /faturas/:id/status` (`{ status, installmentNumber? }`).
 - `GET /faturas/:id/whatsapp` — telefone, mensagem e link `wa.me` para cobrança
   do saldo restante (não envia automaticamente). Uma venda → uma fatura.
 
+### Mercado Livre — compras
+
+- `POST /mercadolivre/connect` inicia OAuth; o callback público é
+  `/mercadolivre/oauth/callback`.
+- `GET /mercadolivre/status`, `POST /mercadolivre/sync`,
+  `GET /mercadolivre/purchases`, `DELETE /mercadolivre/connect`.
+- Compras são armazenadas separadas das faturas de vendas. Sincronização
+  imediata após OAuth e periódica a cada 15 minutos; verifica documentos fiscais
+  do pack e disponibiliza o download autenticado quando houver permissão.
+- Acesso somente de administrador; tokens OAuth são criptografados com
+  `MERCADOLIVRE_TOKEN_ENCRYPTION_KEY` (Base64, 32 bytes).
+- Conta também precisa ser vendedora para publicar. Produto pode armazenar
+  `mercadoLivreListing` (categoria, condição, listing type, imagens, frete e
+  atributos); produto com configuração completa é publicado automaticamente
+  no cadastro/edição. Produtos pendentes são tentados novamente durante a
+  sincronização. `POST /mercadolivre/products/:productId/publish` configura e
+  publica manualmente; `GET /mercadolivre/categories/:categoryId/attributes`
+  consulta os atributos obrigatórios. Mudanças de preço/estoque propagam para
+  anúncios já publicados.
+- Configuração: `MERCADOLIVRE_CLIENT_ID`,
+  `MERCADOLIVRE_CLIENT_SECRET`, `MERCADOLIVRE_REDIRECT_URI` e
+  `MERCADOLIVRE_TOKEN_ENCRYPTION_KEY`.
+
 ### EasyBot (WhatsApp) (`GET|POST|PATCH|DELETE /easybot/*`, JWT, admin)
+
 - `GET /easybot/status`, `POST /easybot/connect`, `POST /easybot/disconnect`.
 - `GET|POST /easybot/contacts`, `PATCH|DELETE /easybot/contacts/:contactId`.
 - `GET /easybot/contacts/:contactId/messages`.
 - `POST /easybot/messages` — envio para contato cadastrado.
 - Sessão salva localmente (`LocalAuth`), uma instância por pasta de sessão.
-- Mensagens recebidas respondem automaticamente (contatos com
-  `autoReplyEnabled`) usando `AiService.replyForWhatsApp` (read-only tools).
+- Mensagens recebidas de contatos cadastrados são salvas; contatos com
+  `autoReplyEnabled` recebem resposta automática via
+  `AiService.replyForWhatsApp` (ferramentas somente de leitura).
+- No chat da Sell IA, é possível pedir envio para contato cadastrado. A IA
+  propõe a ação `send_whatsapp_message`, que exige confirmação do administrador
+  e conexão ativa do WhatsApp antes de enviar.
 - Respostas automáticas: filtra contatos com `autoReplyEnabled: true`,
   histórico de 20 mensagens, limite de 4096 chars/round, envia como contato
   do administrador da empresa.
@@ -164,28 +204,28 @@ Convenção: cada módulo em `src/<modulo>/` com `.controller.ts`, `.service.ts`
 ## Schema / entidades relevantes
 
 - `EasyBotAccount`: `{ companyId (único), status, phoneNumber?, lastError?,
-  connectedAt? }`.
+connectedAt? }`.
 - `EasyBotContact`: `{ companyId, name, phone (único por empresa),
-  autoReplyEnabled (default true) }`. Índice `{ companyId, phone }` único.
+autoReplyEnabled (default true) }`. Índice `{ companyId, phone }` único.
 - `EasyBotMessage`: `{ companyId, contactId, phone, direction
-  (incoming|outgoing), content, status (received|sending|sent|failed),
-  error? }`. Índice `{ companyId, contactId, createdAt: -1 }`.
+(incoming|outgoing), content, status (received|sending|sent|failed),
+error? }`. Índice `{ companyId, contactId, createdAt: -1 }`.
 - `AiConversation`: `{ userId, companyId, title, messages[], pendingAction?,
-  createdAt, updatedAt }`. Mensagens: role `user|assistant|tool`,
+createdAt, updatedAt }`. Mensagens: role `user|assistant|tool`,
   `tool_calls`, `tool_call_id`, `name`, `timestamp`.
 
 ## Pendências abertas
 
 - [ ] Registrar `ObserveModule.forRootAsync` em `AppModule` (ou remover a
-  importação não usada).
+      importação não usada).
 - [ ] `src/ai/ai.service.spec.ts`: o assert de modelo deve ler
-  `openai/gpt-oss-120b` de `agent.json` em vez de hardcode.
+      `openai/gpt-oss-120b` de `agent.json` em vez de hardcode.
 - [ ] Fixtures de provider (`UserModel`, `ProdutoModel`, `ClienteModel`) nos
-  specs de controller/service para resolver "Nest can't resolve dependencies".
+      specs de controller/service para resolver "Nest can't resolve dependencies".
 - [ ] Revisar `test/app.e2e-spec.ts` (rota `/` não existe) e o import de
-  `supertest/types`.
+      `supertest/types`.
 - [ ] Remover `git` (arquivo vazio) e rehomear
-  `src/Easysell/opencollection.yml`.
+      `src/Easysell/opencollection.yml`.
 - [ ] CI em `.github/workflows`.
 
 ## Observação sobre o modelo

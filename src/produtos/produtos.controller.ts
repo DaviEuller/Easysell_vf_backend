@@ -1,4 +1,14 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  UsePipes,
+  ValidationPipe,
+} from '@nestjs/common';
 import { ProdutosService } from './produtos.service.js';
 import { CreateProdutoDto } from './dto/create-produto.dto.js';
 import { UpdateProdutoDto } from './dto/update-produto.dto.js';
@@ -10,6 +20,13 @@ export class ProdutosController {
   constructor(private readonly produtosService: ProdutosService) {}
 
   @Post()
+  @UsePipes(
+    new ValidationPipe({
+      transform: true,
+      whitelist: true,
+      forbidNonWhitelisted: true,
+    }),
+  )
   create(@Body() createProdutoDto: CreateProdutoDto) {
     return this.produtosService.create(createProdutoDto);
   }
@@ -30,6 +47,13 @@ export class ProdutosController {
   }
 
   @Patch(':id')
+  @UsePipes(
+    new ValidationPipe({
+      transform: true,
+      whitelist: true,
+      forbidNonWhitelisted: true,
+    }),
+  )
   update(@Param('id') _id: string, @Body() updateProdutoDto: UpdateProdutoDto) {
     return this.produtosService.update(_id, updateProdutoDto);
   }

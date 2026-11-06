@@ -7,6 +7,8 @@ import {
   IsString,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ValidateNested } from 'class-validator';
+import { MercadoLivreProductListingDto } from './mercadolivre-product-listing.dto.js';
 
 export class CreateProdutoDto {
   @ApiProperty({ example: 'Camiseta básica' })
@@ -55,4 +57,10 @@ export class CreateProdutoDto {
   @IsNumber()
   @ApiPropertyOptional({ example: 79.9, minimum: 0 })
   price?: number;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => MercadoLivreProductListingDto)
+  @ApiPropertyOptional({ type: MercadoLivreProductListingDto })
+  mercadoLivreListing?: MercadoLivreProductListingDto;
 }

@@ -5,6 +5,7 @@ import { AuthModule } from '../auth/auth.module.js';
 import { User, UserSchema } from '../users/schemas/user.schema.js';
 import { EasyBotController } from './easybot.controller.js';
 import { EasyBotService } from './easybot.service.js';
+import { EASYBOT_MESSAGE_SENDER } from './easybot-message-sender.js';
 import {
   EasyBotAccount,
   EasyBotAccountSchema,
@@ -30,6 +31,12 @@ import {
     ]),
   ],
   controllers: [EasyBotController],
-  providers: [EasyBotService],
+  providers: [
+    EasyBotService,
+    {
+      provide: EASYBOT_MESSAGE_SENDER,
+      useExisting: EasyBotService,
+    },
+  ],
 })
 export class EasyBotModule {}

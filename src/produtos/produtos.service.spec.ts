@@ -1,6 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { getModelToken } from '@nestjs/mongoose';
 import { validate } from 'class-validator';
+import { Produto } from './Schemas/Schemas.produtos.js';
 import { CreateProdutoDto } from './dto/create-produto.dto.js';
+import { MercadoLivreService } from '../mercadolivre/mercadolivre.service.js';
 import { ProdutosService } from './produtos.service.js';
 
 describe('ProdutosService', () => {
@@ -8,7 +11,14 @@ describe('ProdutosService', () => {
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      providers: [ProdutosService],
+      providers: [
+        ProdutosService,
+        { provide: getModelToken(Produto.name), useValue: {} },
+        {
+          provide: MercadoLivreService,
+          useValue: { publishConfiguredProduct: vi.fn() },
+        },
+      ],
     }).compile();
 
     service = module.get<ProdutosService>(ProdutosService);

@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
+import { AuthModule } from '../auth/auth.module.js';
 
 import { CompanyService } from './company.service.js';
 import { CompanyController } from './company.controller.js';
@@ -10,6 +11,7 @@ import { Equipe, EquipeSchema } from '../equipe/entities/equipe.entity.js';
 
 @Module({
   imports: [
+    AuthModule,
     MongooseModule.forFeature([
       {
         name: Company.name,

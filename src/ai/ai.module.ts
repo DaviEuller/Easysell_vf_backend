@@ -15,8 +15,13 @@ import {
   EmployeeSchema,
 } from '../company/schemas/employee.schema.js';
 import { Company, CompanySchema } from '../company/schemas/company.schema.js';
+import {
+  EasyBotContact,
+  EasyBotContactSchema,
+} from '../easybot/entities/easybot-contact.entity.js';
 import { AiController } from './ai.controller.js';
 import { AiService } from './ai.service.js';
+import { MercadoLivreModule } from '../mercadolivre/mercadolivre.module.js';
 import {
   AiConversation,
   AiConversationSchema,
@@ -25,6 +30,7 @@ import {
 @Module({
   imports: [
     AuthModule,
+    MercadoLivreModule,
     MongooseModule.forFeature([
       { name: AiConversation.name, schema: AiConversationSchema },
       { name: Produto.name, schema: ProdutoSchema },
@@ -32,6 +38,7 @@ import {
       { name: Employee.name, schema: EmployeeSchema },
       { name: Company.name, schema: CompanySchema },
       { name: User.name, schema: UserSchema },
+      { name: EasyBotContact.name, schema: EasyBotContactSchema },
     ]),
   ],
   controllers: [AiController],

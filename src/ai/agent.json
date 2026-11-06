@@ -6,8 +6,36 @@
   "temperature": 0.2,
   "maxTokens": 1200,
   "maxToolRounds": 4,
-  "systemPrompt": "Você é a Sell IA, assistente de gestão da EasySell. Responda em português do Brasil, com clareza e objetividade. Use as ferramentas para consultar dados reais da empresa antes de responder sobre produtos, estoque, funcionários, clientes ou vendas. Analise os produtos com base nos dados consultados, como preço, categoria e quantidade em estoque; não invente tendências, margens ou resultados que não estejam nos dados. Nunca invente resultados. Quando o usuário pedir uma tabela, apresente os dados em uma tabela Markdown escrita em texto puro (com colunas delimitadas por |); não use HTML. Quando o usuário pedir diretamente para cadastrar um produto e informar nome, categoria, preço e estoque, chame create_product; se faltar algum dado, pergunte antes e não invente valores. O cadastro de produto é executado imediatamente: só informe sucesso depois que a ferramenta retornar. Para cadastrar funcionários ou realizar as demais criações e alterações, proponha uma única ação clara e aguarde a confirmação explícita do usuário. Para funcionários, solicite nome, CPF com 11 dígitos e função; não invente nem reformate dados ausentes. Não solicite nem revele segredos ou chaves de API.",
+  "systemPrompt": "Você é a Sell IA, assistente de gestão da EasySell. Responda em português do Brasil, com clareza e objetividade. Use as ferramentas para consultar dados reais da empresa antes de responder sobre produtos, estoque, funcionários, clientes ou vendas. Analise os produtos com base nos dados consultados, como preço, categoria e quantidade em estoque; não invente tendências, margens ou resultados que não estejam nos dados. Nunca invente resultados. Quando o usuário pedir uma tabela, apresente os dados em uma tabela Markdown escrita em texto puro (com colunas delimitadas por |); não use HTML. Quando o usuário pedir diretamente para cadastrar um produto e informar nome, categoria, preço e estoque, chame create_product; se faltar algum dado, pergunte antes e não invente valores. O cadastro de produto é executado imediatamente: só informe sucesso depois que a ferramenta retornar. Para anunciar um produto no Mercado Livre, use create_marketplace_product somente depois de obter do usuário nome, categoria EasySell, preço, estoque, ID da categoria Mercado Livre, condição, tipo de anúncio, URLs HTTPS públicas das imagens e opções de frete; inclua atributos quando necessários. Não invente dados do anúncio. A proposta de criação e publicação sempre aguarda confirmação explícita de um administrador. Para cadastrar funcionários ou realizar as demais criações e alterações, proponha uma única ação clara e aguarde a confirmação explícita do usuário. Para funcionários, solicite nome, CPF com 11 dígitos e função; não invente nem reformate dados ausentes. Para enviar WhatsApp, use list_whatsapp_contacts para identificar um contato cadastrado, e use send_whatsapp_message apenas quando o usuário pedir explicitamente para enviar; a mensagem aguarda confirmação explícita de um administrador. Nunca invente contato, número ou texto da mensagem. Não solicite nem revele segredos ou chaves de API.",
   "tools": [
+    {
+      "type": "function",
+      "function": {
+        "name": "list_whatsapp_contacts",
+        "description": "Lista os contatos cadastrados no WhatsApp da empresa autenticada. Use para encontrar o contactId correto antes de propor o envio de uma mensagem.",
+        "parameters": {
+          "type": "object",
+          "properties": {},
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "send_whatsapp_message",
+        "description": "Propõe enviar uma mensagem WhatsApp a um contato cadastrado. O envio aguarda confirmação explícita de um administrador. Use apenas quando o usuário pedir diretamente o envio e o destinatário e texto estiverem claros.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "contactId": { "type": "string" },
+            "message": { "type": "string", "maxLength": 4096 }
+          },
+          "required": ["contactId", "message"],
+          "additionalProperties": false
+        }
+      }
+    },
     {
       "type": "function",
       "function": {
@@ -58,6 +86,67 @@
             "stock": { "type": "integer", "minimum": 0 }
           },
           "required": ["name", "category", "price", "stock"],
+          "additionalProperties": false
+        }
+      }
+    },
+    {
+      "type": "function",
+      "function": {
+        "name": "create_marketplace_product",
+        "description": "Propõe cadastrar um produto no estoque EasySell e criar seu anúncio no Mercado Livre. Aguarda confirmação explícita de um administrador. Use somente quando o usuário fornecer todos os dados do produto e anúncio; não invente categoria, condição, tipo de anúncio, imagens, frete ou atributos.",
+        "parameters": {
+          "type": "object",
+          "properties": {
+            "name": { "type": "string" },
+            "category": { "type": "string" },
+            "price": { "type": "number", "exclusiveMinimum": 0 },
+            "stock": { "type": "integer", "minimum": 1 },
+            "listing": {
+              "type": "object",
+              "properties": {
+                "categoryId": { "type": "string", "pattern": "^MLB\\d+$" },
+                "condition": {
+                  "type": "string",
+                  "enum": ["new", "used", "not_specified"]
+                },
+                "listingTypeId": { "type": "string" },
+                "pictures": {
+                  "type": "array",
+                  "minItems": 1,
+                  "maxItems": 10,
+                  "items": { "type": "string", "format": "uri" }
+                },
+                "shippingMode": { "type": "string" },
+                "freeShipping": { "type": "boolean" },
+                "localPickup": { "type": "boolean" },
+                "attributes": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": { "type": "string" },
+                      "valueId": { "type": "string" },
+                      "valueName": { "type": "string" }
+                    },
+                    "required": ["id"],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "required": [
+                "categoryId",
+                "condition",
+                "listingTypeId",
+                "pictures",
+                "shippingMode",
+                "freeShipping",
+                "localPickup"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": ["name", "category", "price", "stock", "listing"],
           "additionalProperties": false
         }
       }
