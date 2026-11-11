@@ -5,6 +5,7 @@ import { ForgotPasswordDto } from './dto/forgot-password.dto.js';
 import { ResetPasswordDto } from './dto/reset-password.dto.js';
 import { JwtAuthGuard } from './jwt.guard.js';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 
 @Controller('auth')
 @ApiTags('Autenticação')
@@ -12,18 +13,21 @@ export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Post('login')  
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @HttpCode(200)
   async login(@Body() loginDto: LoginDto) {
     return this.authService.login(loginDto.email, loginDto.password);
   }
 
   @Post('forgot-password')
+  @Throttle({ default: { limit: 3, ttl: 60_000 } })
   @HttpCode(200)
   async forgotPassword(@Body() dto: ForgotPasswordDto) {
     return this.authService.sendPasswordResetCode(dto.email);
   }
 
   @Post('reset-password')
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @HttpCode(200)
   async resetPassword(@Body() dto: ResetPasswordDto) {
     return this.authService.resetPassword(dto.email, dto.code, dto.password);
