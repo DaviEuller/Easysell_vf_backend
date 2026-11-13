@@ -50,13 +50,19 @@ describe('AiService', () => {
   let previousApiKey: string | undefined;
   let previousBaseUrl: string | undefined;
   let previousModel: string | undefined;
+  let previousAiServiceUrl: string | undefined;
+  let previousAiServiceKey: string | undefined;
 
   beforeEach(() => {
     previousApiKey = process.env.GROQ_API_KEY;
     previousBaseUrl = process.env.AI_API_BASE_URL;
     previousModel = process.env.AI_MODEL;
+    previousAiServiceUrl = process.env.AI_SERVICE_URL;
+    previousAiServiceKey = process.env.AI_SERVICE_KEY;
     process.env.GROQ_API_KEY = 'test-api-key';
     process.env.AI_API_BASE_URL = 'https://ai.example.test/v1';
+    delete process.env.AI_SERVICE_URL;
+    delete process.env.AI_SERVICE_KEY;
     fetchMock = vi.fn();
     vi.stubGlobal('fetch', fetchMock);
 
@@ -109,6 +115,10 @@ describe('AiService', () => {
     else process.env.AI_API_BASE_URL = previousBaseUrl;
     if (previousModel === undefined) delete process.env.AI_MODEL;
     else process.env.AI_MODEL = previousModel;
+    if (previousAiServiceUrl === undefined) delete process.env.AI_SERVICE_URL;
+    else process.env.AI_SERVICE_URL = previousAiServiceUrl;
+    if (previousAiServiceKey === undefined) delete process.env.AI_SERVICE_KEY;
+    else process.env.AI_SERVICE_KEY = previousAiServiceKey;
   });
 
   it('creates a product in Mongo when the model calls create_product', async () => {
@@ -464,6 +474,35 @@ describe('AiService', () => {
       'list_products',
       'list_sales',
     ]);
+  });
+
+  it('uses the separate authenticated inference service when configured', async () => {
+    process.env.AI_SERVICE_URL = 'https://ai-service.example.test/';
+    process.env.AI_SERVICE_KEY = 'internal-test-key';
+    fetchMock.mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          choices: [{ message: { content: 'Resposta remota.' } }],
+        }),
+        { status: 200 },
+      ),
+    );
+
+    await expect(
+      service.replyForWhatsApp({ userId, companyId }, 'Cliente', [
+        { role: 'user', content: 'Olá' },
+      ]),
+    ).resolves.toBe('Resposta remota.');
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://ai-service.example.test/v1/chat/completions',
+      expect.objectContaining({
+        headers: {
+          'x-ai-service-key': 'internal-test-key',
+          'Content-Type': 'application/json',
+        },
+      }),
+    );
   });
 
   it('proposes WhatsApp messages for administrator confirmation', async () => {

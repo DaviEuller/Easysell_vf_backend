@@ -909,11 +909,15 @@ export class AiService {
   }
 
   private assertProviderConfiguration() {
-    this.getApiKey();
-    if (!(process.env.AI_API_BASE_URL?.trim() || this.agent.baseUrl)) {
-      throw new BadRequestException(
-        'Configure a URL base do provedor em AI_API_BASE_URL ou src/ai/agent.json.',
-      );
+    if (process.env.AI_SERVICE_URL?.trim()) {
+      this.getAiServiceKey();
+    } else {
+      this.getApiKey();
+      if (!(process.env.AI_API_BASE_URL?.trim() || this.agent.baseUrl)) {
+        throw new BadRequestException(
+          'Configure uma URL do provedor em AI_API_BASE_URL ou AI_SERVICE_URL.',
+        );
+      }
     }
     if (!this.getModelName()) {
       throw new BadRequestException(
@@ -927,50 +931,52 @@ export class AiService {
     options: ModelRequestOptions = {},
   ): Promise<ProviderMessage> {
     this.assertProviderConfiguration();
-    const apiKey = this.getApiKey();
-    const baseUrl = process.env.AI_API_BASE_URL?.trim() || this.agent.baseUrl;
+    const aiServiceUrl = process.env.AI_SERVICE_URL?.trim();
+    const apiKey = aiServiceUrl ? this.getAiServiceKey() : this.getApiKey();
+    const providerBaseUrl =
+      process.env.AI_API_BASE_URL?.trim() || this.agent.baseUrl;
+    const endpoint = aiServiceUrl
+      ? `${aiServiceUrl.replace(/\/+$/, '')}/v1/chat/completions`
+      : `${providerBaseUrl.replace(/\/+$/, '')}/chat/completions`;
 
     let response: Response;
     try {
-      response = await fetch(
-        `${baseUrl.replace(/\/+$/, '')}/chat/completions`,
-        {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${apiKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            model: this.getModelName(),
-            messages: [
-              {
-                role: 'system',
-                content: options.systemPrompt ?? this.agent.systemPrompt,
-              },
-              ...messages.slice(-50).map((message) => ({
-                role: message.role,
-                content: message.content,
-                ...(message.tool_call_id
-                  ? { tool_call_id: message.tool_call_id }
-                  : {}),
-                ...(message.name ? { name: message.name } : {}),
-                ...(message.tool_calls
-                  ? { tool_calls: message.tool_calls }
-                  : {}),
-              })),
-            ],
-            tools: options.tools ?? this.agent.tools,
-            tool_choice: 'auto',
-            parallel_tool_calls: false,
-            temperature: this.agent.temperature,
-            max_tokens: this.agent.maxTokens,
-          }),
-          signal: AbortSignal.timeout(45_000),
+      response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          ...(aiServiceUrl
+            ? { 'x-ai-service-key': apiKey }
+            : { Authorization: `Bearer ${apiKey}` }),
+          'Content-Type': 'application/json',
         },
-      );
+        body: JSON.stringify({
+          model: this.getModelName(),
+          messages: [
+            {
+              role: 'system',
+              content: options.systemPrompt ?? this.agent.systemPrompt,
+            },
+            ...messages.slice(-50).map((message) => ({
+              role: message.role,
+              content: message.content,
+              ...(message.tool_call_id
+                ? { tool_call_id: message.tool_call_id }
+                : {}),
+              ...(message.name ? { name: message.name } : {}),
+              ...(message.tool_calls ? { tool_calls: message.tool_calls } : {}),
+            })),
+          ],
+          tools: options.tools ?? this.agent.tools,
+          tool_choice: 'auto',
+          parallel_tool_calls: false,
+          temperature: this.agent.temperature,
+          max_tokens: this.agent.maxTokens,
+        }),
+        signal: AbortSignal.timeout(45_000),
+      });
     } catch {
       throw new BadGatewayException(
-        'Não foi possível conectar ao provedor de IA. Verifique a URL e tente novamente.',
+        'Não foi possível conectar ao serviço de IA. Verifique a URL e tente novamente.',
       );
     }
 
@@ -1048,6 +1054,16 @@ export class AiService {
       }
     }
     return { content, toolCalls };
+  }
+
+  private getAiServiceKey() {
+    const key = process.env.AI_SERVICE_KEY?.trim();
+    if (!key) {
+      throw new BadRequestException(
+        'Defina AI_SERVICE_KEY no ambiente do backend para autenticar no serviço de IA.',
+      );
+    }
+    return key;
   }
 
   private parseToolArguments(value: string) {

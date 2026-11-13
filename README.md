@@ -58,6 +58,34 @@ esse padrão. O modelo Llama 3.3 anterior foi desativado pela Groq em 16/08/2026
 
 O recurso NestJS `ai` protege as rotas com JWT, restringe conversas e consultas
 à empresa do usuário autenticado e armazena o histórico no MongoDB existente.
+
+### Servidor de inferência separado
+
+Para executar a inferência em outro servidor, construa e publique a imagem
+`Dockerfile.ai`. Esse serviço expõe `POST /v1/chat/completions`, protegido pela
+chave interna `AI_SERVICE_KEY`; não exponha essa chave no Flutter. Configure no
+servidor de inferência `AI_SERVICE_KEY`, `GROQ_API_KEY` e, se necessário,
+`AI_API_BASE_URL`/`AI_SERVICE_PORT`. Use HTTPS ou a rede privada do provedor
+entre os servidores.
+
+No backend EasySell, configure `AI_SERVICE_URL` com a URL do serviço e o mesmo
+valor de `AI_SERVICE_KEY`. Quando `AI_SERVICE_URL` estiver configurada, o
+backend envia as inferências para esse servidor; sem ela, mantém a chamada
+direta ao provedor. Os usuários continuam usando `POST /ai/chat` com o JWT
+normal do EasySell, de modo que autenticação, histórico e isolamento por
+empresa permanecem no backend principal.
+
+Exemplo de build local da imagem:
+
+```bash
+docker build -f Dockerfile.ai -t easysell-ai .
+```
+
+Variáveis `AI_SERVICE_URL` e `AI_SERVICE_KEY` pertencem ao ambiente do backend;
+`AI_SERVICE_KEY` e `GROQ_API_KEY` devem também estar configuradas como segredos
+no serviço de inferência. Gere uma chave interna aleatória e configure o mesmo
+valor nos dois servidores. O health check público está em `GET /health`; a rota
+de inferência exige a chave interna.
 Ferramentas de leitura consultam produtos e vendas. Criação e edição de produtos,
 estoque, dados de cliente e vendas sempre ficam pendentes até uma confirmação
 explícita no frontend. A criação e a edição de vendas usam transações MongoDB;
@@ -416,6 +444,9 @@ Variáveis de ambiente
 | MONGODB_URI | String de conexão com o MongoDB |
 | JWT_SECRET | Segredo para assinar os tokens JWT |
 | AI_API_BASE_URL | URL base do provedor de IA |
+| AI_SERVICE_URL | URL do servidor de inferência separado (opcional) |
+| AI_SERVICE_KEY | Segredo interno compartilhado entre backend e serviço de IA |
+| AI_SERVICE_PORT | Porta do serviço de inferência (padrão: 3001) |
 | GROQ_API_KEY | Chave da API do Groq |
 | AI_MODEL | Modelo de IA utilizado |
 | EMAILJS_PUBLIC_KEY | Chave pública do EmailJS |
