@@ -209,7 +209,10 @@ ou preencha os itens manualmente antes de confirmar.
 ## Vendas parceladas e faturas
 
 Ao criar uma venda em `POST /clientes`, podem ser informados `parcelas`,
-`valorPago` e `dataPrimeiroVencimento` (data ISO). O backend calcula
+`valorPago`, `dataPrimeiroVencimento` (data ISO), `funcionarioId` e `status`
+(`Concluída`, `Pendente` ou `Cancelada`). O funcionário e o status são
+persistidos e retornados junto com a venda; vendas sem status começam como
+`Pendente`. O backend calcula
 `saldoPendente`; o pagamento inicial deve estar entre zero e o valor total da
 venda. Vendas existentes sem esses campos são interpretadas como uma parcela e
 nenhum valor pago inicialmente.
@@ -226,9 +229,18 @@ Exemplo de venda com entrada e saldo parcelado:
   "Quantidade": 2,
   "parcelas": 3,
   "valorPago": 60,
+  "funcionarioId": "ID_DO_FUNCIONARIO",
+  "status": "Concluída",
   "dataPrimeiroVencimento": "2026-11-21"
 }
 ```
+
+No cadastro, crie a conta com `POST /user` e o papel desejado; em seguida,
+`POST /company/bootstrap/:userId` cria a empresa e associa o usuário como
+administrador. O corpo do bootstrap contém `name`, `categoria`, `cnpj` e
+`cpfResponsavel`. A equipe pode ser gerenciada em `POST /company/employees`,
+`PATCH /company/employees/:id` e `DELETE /company/employees/:id`; o status do
+funcionário aceita `Ativo` ou `Férias` e, por padrão, inicia como `Ativo`.
 
 Para gerar uma fatura, use `POST /faturas` com `saleId`; pode enviar
 `dueDate` para substituir a data de primeiro vencimento salva na venda. Se a

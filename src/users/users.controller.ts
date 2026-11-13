@@ -6,18 +6,18 @@ import {
   Delete,
   Param,
   Query,
+  Patch,
 } from '@nestjs/common';
 
 import { UsersService } from './users.service.js';
 import { CreateUserDto } from './dto/create-user.dto.js';
+import { UpdateUserDto } from './dto/update-user.dto.js';
 import { ApiTags } from '@nestjs/swagger';
 
 @Controller('user')
 @ApiTags('Usuários')
 export class UsersController {
-  constructor(
-    private readonly usersService: UsersService,
-  ) {}
+  constructor(private readonly usersService: UsersService) {}
 
   @Post()
   create(@Body() createUserDto: CreateUserDto) {
@@ -32,6 +32,11 @@ export class UsersController {
   @Get(':id')
   async findOne(@Param('id') id: string) {
     return this.usersService.findOne(id);
+  }
+
+  @Patch(':id')
+  update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto) {
+    return this.usersService.update(id, updateUserDto);
   }
 
   @Get()

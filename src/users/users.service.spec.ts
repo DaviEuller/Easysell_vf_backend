@@ -43,7 +43,7 @@ describe('UsersService', () => {
     expect(service).toBeDefined();
   });
 
-  it('creates new accounts as employees regardless of a requested role', async () => {
+  it('preserves the requested role for a new account', async () => {
     const user = await service.create({
       name: 'João Silva',
       email: 'joao@example.com',
@@ -55,9 +55,21 @@ describe('UsersService', () => {
       expect.objectContaining({
         name: 'João Silva',
         email: 'joao@example.com',
-        role: UserRole.FUNCIONARIO,
+        role: UserRole.ADMINISTRADOR,
       }),
     );
+    expect(user).toEqual(
+      expect.objectContaining({ role: UserRole.ADMINISTRADOR }),
+    );
+  });
+
+  it('defaults new accounts without a requested role to employee', async () => {
+    const user = await service.create({
+      name: 'João Silva',
+      email: 'joao@example.com',
+      password: 'secret123',
+    });
+
     expect(user).toEqual(
       expect.objectContaining({ role: UserRole.FUNCIONARIO }),
     );

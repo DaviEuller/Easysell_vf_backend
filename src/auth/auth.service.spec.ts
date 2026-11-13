@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
 import { UsersService } from '../users/users.service.js';
 import { AuthService } from './auth.service.js';
@@ -17,6 +18,7 @@ describe('AuthService', () => {
         AuthService,
         { provide: UsersService, useValue: { findByEmail } },
         { provide: JwtService, useValue: { sign } },
+        { provide: ConfigService, useValue: {} },
       ],
     }).compile();
 
@@ -52,6 +54,10 @@ describe('AuthService', () => {
     expect(sign).toHaveBeenCalledWith(
       expect.objectContaining({ empresaId: 'company-id' }),
     );
+    const tokenPayload = sign.mock.calls[0][0];
+    expect(tokenPayload).not.toHaveProperty('senha');
+    expect(tokenPayload).not.toHaveProperty('passwordHash');
+    expect(JSON.stringify(tokenPayload)).not.toContain(passwordHash);
   });
 
   it('rejects an email that does not match an account', async () => {

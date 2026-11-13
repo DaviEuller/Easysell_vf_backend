@@ -15,6 +15,9 @@ import { UserRole } from '../users/enum/user.role.enum.js';
 import { Equipe, EquipeDocument } from '../equipe/entities/equipe.entity.js';
 import { CreateCompanyDto } from './dto/create-company.dto.js';
 import { UpdateCompanyDto } from './dto/update-company.dto.js';
+import { BootstrapCompanyDto } from './dto/bootstrap-company.dto.js';
+import { CreateEmployeeDto } from './dto/create-employee.dto.js';
+import { UpdateEmployeeDto } from './dto/update-employee.dto.js';
 
 function isDuplicateCnpjError(error: unknown): boolean {
   if (typeof error !== 'object' || error === null || !('code' in error)) {
@@ -23,15 +26,14 @@ function isDuplicateCnpjError(error: unknown): boolean {
   if (error.code !== 11000) return false;
 
   if ('keyPattern' in error && typeof error.keyPattern === 'object') {
-    return (
-      error.keyPattern !== null &&
-      'cnpj' in error.keyPattern
-    );
+    return error.keyPattern !== null && 'cnpj' in error.keyPattern;
   }
 
-  return 'message' in error &&
+  return (
+    'message' in error &&
     typeof error.message === 'string' &&
-    /index:\s*cnpj_1\b/.test(error.message);
+    /index:\s*cnpj_1\b/.test(error.message)
+  );
 }
 
 @Injectable()
@@ -144,6 +146,91 @@ export class CompanyService {
       await this.companyModel.findByIdAndDelete(savedCompany._id).exec();
       throw error;
     }
+  }
+
+  async bootstrap(
+    userId: string,
+    bootstrapCompanyDto: BootstrapCompanyDto,
+  ): Promise<CompanyDocument> {
+    const user = await this.userModel.findById(userId).select('company').exec();
+    if (!user) {
+      throw new NotFoundException(`Usuário com id ${userId} não encontrado`);
+    }
+    if (user.company) {
+      const company = await this.companyModel
+        .findById(user.company)
+        .exec();
+      if (company) return company;
+    }
+    return this.create({
+      name: bootstrapCompanyDto.name,
+      categoria: bootstrapCompanyDto.categoria,
+      cnpj: bootstrapCompanyDto.cnpj,
+      cpfResponsavel: bootstrapCompanyDto.cpfResponsavel,
+      responsavelId: userId,
+    });
+  }
+
+  async createEmployee(
+    createEmployeeDto: CreateEmployeeDto,
+  ): Promise<EmployeeDocument> {
+    const company = await this.companyModel
+      .findById(createEmployeeDto.companyId)
+      .exec();
+    if (!company) {
+      throw new NotFoundException(
+        `Empresa com id ${createEmployeeDto.companyId} não encontrada`,
+      );
+    }
+
+    const employee = await new this.employeeModel(createEmployeeDto).save();
+    try {
+      const updatedCompany = await this.companyModel
+        .findByIdAndUpdate(
+          createEmployeeDto.companyId,
+          { $addToSet: { employeeIds: employee._id } },
+          { returnDocument: 'after', runValidators: true },
+        )
+        .exec();
+      if (!updatedCompany) {
+        throw new NotFoundException(
+          `Empresa com id ${createEmployeeDto.companyId} não encontrada`,
+        );
+      }
+    } catch (error) {
+      await this.employeeModel.findByIdAndDelete(employee._id).exec();
+      throw error;
+    }
+    return employee;
+  }
+
+  async updateEmployee(
+    id: string,
+    updateEmployeeDto: UpdateEmployeeDto,
+  ): Promise<EmployeeDocument> {
+    const employee = await this.employeeModel
+      .findByIdAndUpdate(id, updateEmployeeDto, {
+        returnDocument: 'after',
+        runValidators: true,
+      })
+      .exec();
+    if (!employee) {
+      throw new NotFoundException(`Funcionário com id ${id} não encontrado`);
+    }
+    return employee;
+  }
+
+  async removeEmployee(id: string): Promise<EmployeeDocument> {
+    const employee = await this.employeeModel.findByIdAndDelete(id).exec();
+    if (!employee) {
+      throw new NotFoundException(`Funcionário com id ${id} não encontrado`);
+    }
+    await this.companyModel
+      .findByIdAndUpdate(employee.companyId, {
+        $pull: { employeeIds: employee._id },
+      })
+      .exec();
+    return employee;
   }
 
   async addEmployeeToCompany(

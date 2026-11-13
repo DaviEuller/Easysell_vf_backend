@@ -31,7 +31,7 @@ export class UsersService {
     const user = new this.userDocument({
       ...userData,
       passwordHash,
-      role: UserRole.FUNCIONARIO,
+      role: createUserDto.role ?? UserRole.FUNCIONARIO,
     });
 
     return user.save();
@@ -91,9 +91,11 @@ export class UsersService {
     id: string,
     updateUserDto: UpdateUserDto,
   ): Promise<UserDocument> {
+    const company = updateUserDto.companyId ?? updateUserDto.company;
     const user = await this.userDocument
-      .findByIdAndUpdate(id, updateUserDto, {
+      .findByIdAndUpdate(id, company ? { company } : {}, {
         returnDocument: 'after',
+        runValidators: true,
       })
       .exec();
 

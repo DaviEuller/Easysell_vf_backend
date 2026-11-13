@@ -1,7 +1,14 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { HydratedDocument } from 'mongoose';
+import { Types } from 'mongoose';
 
 export type ClienteDocument = HydratedDocument<Cliente>;
+
+export enum SaleStatus {
+  CONCLUIDA = 'Concluída',
+  PENDENTE = 'Pendente',
+  CANCELADA = 'Cancelada',
+}
 
 @Schema({ timestamps: true })
 export class Cliente {
@@ -16,6 +23,16 @@ export class Cliente {
 
   @Prop({ required: true })
   idcompany: string;
+
+  @Prop({ type: Types.ObjectId, ref: 'Employee' })
+  funcionarioId?: Types.ObjectId;
+
+  @Prop({
+    type: String,
+    enum: Object.values(SaleStatus),
+    default: SaleStatus.PENDENTE,
+  })
+  status: SaleStatus;
 
   @Prop({ required: true })
   Preco_gasto: number;

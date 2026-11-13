@@ -90,6 +90,10 @@ export class ClientesService {
       Numero: createClienteDto.Numero,
       IdProduto: createClienteDto.IdProduto,
       idcompany: createClienteDto.idcompany,
+      ...(createClienteDto.funcionarioId
+        ? { funcionarioId: createClienteDto.funcionarioId }
+        : {}),
+      ...(createClienteDto.status ? { status: createClienteDto.status } : {}),
       Preco_gasto: total,
       Quantidade: quantidade,
       parcelas,
@@ -152,6 +156,7 @@ export class ClientesService {
     const cliente = await this.clienteModel
       .findByIdAndUpdate(id, updateClienteDto, {
         returnDocument: 'after',
+        runValidators: true,
       })
       .exec();
 

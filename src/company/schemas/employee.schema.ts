@@ -3,6 +3,11 @@ import { HydratedDocument, Types } from 'mongoose';
 
 export type EmployeeDocument = HydratedDocument<Employee>;
 
+export enum EmployeeStatus {
+  ATIVO = 'Ativo',
+  FERIAS = 'Férias',
+}
+
 @Schema({ timestamps: true })
 export class Employee {
   @Prop({ type: Date, default: Date.now })
@@ -25,6 +30,13 @@ export class Employee {
 
   @Prop({ required: true, trim: true })
   funcao: string;
+
+  @Prop({
+    type: String,
+    enum: Object.values(EmployeeStatus),
+    default: EmployeeStatus.ATIVO,
+  })
+  status: EmployeeStatus;
 }
 
 export const EmployeeSchema = SchemaFactory.createForClass(Employee);

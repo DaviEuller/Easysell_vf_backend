@@ -4,8 +4,10 @@ import {
   IsOptional,
   IsString,
   Matches,
+  IsEnum,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { EmployeeStatus } from '../schemas/employee.schema.js';
 
 export class CreateEmployeeDto {
   @ApiProperty({ example: 'Pedro Santos' })
@@ -35,4 +37,9 @@ export class CreateEmployeeDto {
   @IsNotEmpty()
   @ApiProperty({ example: 'Estoquista' })
   funcao: string;
+
+  @IsOptional()
+  @IsEnum(EmployeeStatus)
+  @ApiPropertyOptional({ enum: EmployeeStatus, default: EmployeeStatus.ATIVO })
+  status?: EmployeeStatus;
 }

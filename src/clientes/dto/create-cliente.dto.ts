@@ -7,8 +7,11 @@ import {
   IsOptional,
   IsString,
   Min,
+  IsEnum,
+  IsMongoId,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { SaleStatus } from '../Schemas/clientes.schemas.js';
 
 export class CreateClienteDto {
   @ApiProperty({ example: 'João da Silva' })
@@ -61,4 +64,14 @@ export class CreateClienteDto {
   @IsDateString()
   @ApiPropertyOptional({ example: '2026-11-15', format: 'date' })
   dataPrimeiroVencimento?: string;
+
+  @IsOptional()
+  @IsMongoId()
+  @ApiPropertyOptional({ example: '665f1a2b3c4d5e6f7a8b9c0d' })
+  funcionarioId?: string;
+
+  @IsOptional()
+  @IsEnum(SaleStatus)
+  @ApiPropertyOptional({ enum: SaleStatus, default: SaleStatus.PENDENTE })
+  status?: SaleStatus;
 }

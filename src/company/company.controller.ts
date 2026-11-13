@@ -13,6 +13,9 @@ import {
 import { CompanyService } from './company.service.js';
 import { CreateCompanyDto } from './dto/create-company.dto.js';
 import { UpdateCompanyDto } from './dto/update-company.dto.js';
+import { BootstrapCompanyDto } from './dto/bootstrap-company.dto.js';
+import { CreateEmployeeDto } from './dto/create-employee.dto.js';
+import { UpdateEmployeeDto } from './dto/update-employee.dto.js';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt.guard.js';
 
@@ -31,6 +34,32 @@ export class CompanyController {
   @Post()
   create(@Body() createCompanyDto: CreateCompanyDto) {
     return this.companyService.create(createCompanyDto);
+  }
+
+  @Post('bootstrap/:id')
+  bootstrap(
+    @Param('id') userId: string,
+    @Body() bootstrapCompanyDto: BootstrapCompanyDto,
+  ) {
+    return this.companyService.bootstrap(userId, bootstrapCompanyDto);
+  }
+
+  @Post('employees')
+  createEmployee(@Body() createEmployeeDto: CreateEmployeeDto) {
+    return this.companyService.createEmployee(createEmployeeDto);
+  }
+
+  @Patch('employees/:id')
+  updateEmployee(
+    @Param('id') id: string,
+    @Body() updateEmployeeDto: UpdateEmployeeDto,
+  ) {
+    return this.companyService.updateEmployee(id, updateEmployeeDto);
+  }
+
+  @Delete('employees/:id')
+  removeEmployee(@Param('id') id: string) {
+    return this.companyService.removeEmployee(id);
   }
 
   @Get('employees/by-company/:companyId')

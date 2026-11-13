@@ -111,6 +111,8 @@ describe('ClientesService', () => {
       parcelas: 3,
       valorPago: 10,
       dataPrimeiroVencimento: '2026-11-21',
+      funcionarioId: '507f1f77bcf86cd799439012',
+      status: 'Concluída',
     });
 
     expect(createdSale).toMatchObject({
@@ -118,6 +120,8 @@ describe('ClientesService', () => {
       valorPago: 10,
       saldoPendente: 90,
       dataPrimeiroVencimento: new Date('2026-11-21'),
+      funcionarioId: '507f1f77bcf86cd799439012',
+      status: 'Concluída',
     });
   });
 
